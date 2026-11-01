@@ -1,15 +1,11 @@
 from fastapi import FastAPI
-from app.schemas.chat import ChatRequest
-from app.services.chat_service import generate_response
+
+from app.api.routes.chat import router as chat_router
 
 app = FastAPI()
+app.include_router(chat_router)
+
 
 @app.get("/health")
-def health():
+def health() -> dict[str, str]:
     return {"status": "ok"}
-
-@app.post("/chat")
-def chat(request: ChatRequest):
-    return {
-        "response": generate_response(request.message)
-    }
