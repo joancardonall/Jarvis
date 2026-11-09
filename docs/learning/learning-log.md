@@ -1,33 +1,41 @@
 # Registre d'aprenentatge
 
-## 2026-11-01 — Fase 1
+## 2026-11-09 — Conversió a la nova visió
 
-Treball realitzat: inspecció del repositori, extracció del router, incorporació
-de ChatResponse, tests HTTP, empaquetament i documentació.
+L'usuari ha autoritzat que la visió de `jarvis_starter` sigui el projecte principal
+i que es retiri el contingut anterior innecessari (D009).
 
-Problemes trobats:
-- El servei importava ChatResponse encara que no existia; l'aplicació no
-  podia carregar. S'ha eliminat l'import innecessari i creat l'esquema
-  a la capa corresponent.
-- Hi havia bytecode versionat i no hi havia gitignore.
-- El Python accessible era 3.9.6 sense dependències; el pip inicial 21.2.4
-  no admetia aquesta instal·lació editable basada en pyproject.
-  S'ha preparat un entorn aïllat i actualitzat pip.
-- La xarxa restringida ha requerit autorització per descarregar dependències.
+- Documentació i prompts traslladats a l'arrel; instruccions unificades.
+- Retirats el backend d'eco, els seus tests i dependències, el pla de converses/IA
+  local, l'entorn virtual i la configuració de VS Code exclusiva de Python.
+- Cap nova funcionalitat, dependència, servei, migració o desplegament.
+- Arquitectura prevista: Claude interpreta → MCP autenticat → serveis de domini
+  validen → BD conserva; PWA consulta/edita i jobs generen avisos per Telegram.
+  Tot aquest flux continua pendent d'implementació i validació.
 
-Conceptes introduïts, pendents de confirmar: monòlit modular, router,
-Pydantic, contracte HTTP, ASGI, tests d'integració, instal·lació editable,
-dependències directes i transitives.
+Abans de la conversió l'auditoria havia verificat 11 tests del prototip i
+`pip check`. Aquests resultats són històrics i no validen el producte nou.
+Ara no hi ha suite executable; la revisió de conversió comprova estructura,
+enllaços Markdown i absència d'artefactes antics, sense serveis externs.
 
-No es marca cap concepte com a après. Cal revisar:
-1. Per què el servei no necessita importar FastAPI?
-2. On es detecta un message absent?
-3. Què comprova TestClient i què queda fora del seu abast?
+Conceptes pendents de confirmació: visió de producte vs implementació,
+adaptador MCP vs domini, i decisió de stack vs retirada d'un prototip.
 
-Verificació: 11 tests superats amb Python 3.9.6 i pytest 8.3.4, tant a
-l'entorn de treball com en un segon entorn net instal·lat seguint el README.
-pip check no ha detectat dependències incompatibles en cap dels dos.
-Uvicorn és executable i informa de la versió 0.34.0.
-No s'ha comprovat Windows ni s'ha fet una prova de xarxa TCP real.
-Les sis cachés versionades s'han retirat de l'índex, conservant-les localment.
-No s'han fet commits ni push.
+Preguntes de comprensió:
+1. Quina responsabilitat té Claude i quina té Jarvis?
+2. Per què retirar FastAPI no significa haver escollit Workers?
+3. Què cal validar abans de confiar dades personals al MCP remot?
+
+Cap concepte es marca com a après.
+
+## 2026-11-09 — Client inicial Codex
+
+D010 substitueix temporalment Claude per Codex perquè l'usuari no té accés a
+Claude. S'han alineat README, visió, arquitectura, casos d'ús, contracte MCP,
+automatitzacions, seguretat, instruccions i roadmap. Les mencions anteriors
+a Claude en aquest registre descriuen el context històric de D009.
+
+El canvi és documental: cap integració configurada ni validada. La disponibilitat
+del client no acredita connexió al futur MCP de Jarvis ni credencials del backend.
+No s'han executat proves funcionals perquè encara no hi ha aplicació executable.
+Cap concepte es marca com a après.

@@ -1,90 +1,45 @@
-# JARVIS
+# Jarvis — context del projecte
 
-Assistent personal d'IA i projecte educatiu d'Enginyeria de Dades. L'objectiu és aprendre arquitectura backend, APIs, testing, dades i sistemes d'IA mantenint el control de les dades.
+Jarvis és una plataforma personal de dades, seguiment i automatitzacions. **No és un chatbot nou**: Codex és la interfície conversacional; Jarvis conserva informació estructurada, ofereix eines MCP i executa processos fiables; una PWA permet gestionar dades directament; Telegram envia avisos.
 
-## Estat actual
+## Estat actual — 2026-11-09
 
-Fase 1: monòlit modular amb FastAPI, validació Pydantic i tests pytest.
-`GET /health` retorna `{"status": "ok"}`; `POST /chat` retorna un eco fictici.
-No hi ha cap model d'IA connectat, persistència, autenticació ni frontend.
+La visió procedent de `jarvis_starter` és l'únic projecte principal i substitueix
+el pla anterior de chatbot, converses persistents i Ollama. El paquet s'ha
+integrat a l'arrel; el prototip FastAPI, els seus tests i dependències s'han
+retirat per autorització expressa de l'usuari. Vegeu D009 a
+[decisions](docs/DECISIONS.md).
 
-En el futur es volen incorporar memòria permanent, preferències, estudis,
-entrenaments, informes i integracions amb Calendar, Garmin i Hevy.
-Aquestes funcionalitats encara no estan implementades.
+El repositori conté especificació i prompts; encara no hi ha aplicació executable,
+endpoints, servidor MCP, BD, PWA, jobs ni integracions implementades. No hi ha
+ordres d'instal·lació o tests de producte disponibles. El backend, la BD,
+el hosting i l'autenticació continuen pendents de decisió.
 
-Stack actual: Python, FastAPI, Pydantic, Uvicorn, pytest i HTTPX (per als tests).
-Stack previst: Ollama, PostgreSQL + pgvector, React + TypeScript i Docker.
-No cal instal·lar cap component futur ni contractar serveis de pagament.
+## Com continuar
 
-## Preparar un ordinador nou
+1. Llegir la [visió](docs/PRODUCT_VISION.md) i els [casos d'ús](docs/USE_CASES.md).
+2. Revisar les decisions obertes i validar MCP, autenticació i costos.
+3. Aprovar un únic circuit petit de projectes abans d'implementar-lo.
+4. Utilitzar `prompts/02_FIRST_SLICE.md` quan l'abast estigui concretat i aprovat.
 
-Després de clonar el repositori, obre un terminal a l'arrel.
-Cal Python 3.9 o superior; aquesta fase s'ha verificat amb Python 3.9.6.
-Per a un ordinador nou és preferible Python 3.11 o superior; cal executar-hi els tests.
+La conversió no autoritza implementar funcionalitats, contractar serveis ni desplegar.
+El registre del canvi és a [docs/learning/learning-log.md](docs/learning/learning-log.md).
 
-macOS / Linux:
+## Índex
 
-```sh
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -r backend/requirements-dev.lock
-python -m pip install --no-deps -e "./backend[dev]"
-```
+- `docs/PRODUCT_VISION.md`: què és Jarvis, límits i criteris d'èxit.
+- `docs/USE_CASES.md`: escenaris reals i criteris d'acceptació.
+- `docs/DATA_MODEL.md`: model conceptual i regles de persistència.
+- `docs/ARCHITECTURE.md`: components i alternatives encara obertes.
+- `docs/MCP_CONTRACT.md`: eines i semàntica de les operacions.
+- `docs/AUTOMATIONS.md`: resums, seguiment i Telegram.
+- `docs/SECURITY_PRIVACY.md`: autorització, secrets i dades personals.
+- `docs/roadmap.md`: fases i proves de validació.
+- `docs/DECISIONS.md`: registre de decisions i preguntes obertes.
+- `AGENTS.md`: instruccions operatives per a Codex.
+- `prompts/01_REPO_AUDIT.md`: plantilla d'auditoria de només lectura.
+- `prompts/02_FIRST_SLICE.md`: plantilla de tasca d'implementació, no executar encara.
 
-Windows PowerShell (sense necessitat d'activar l'entorn):
+## Regla de treball
 
-```powershell
-py -m venv .venv
-.\.venv\Scripts\python.exe -m pip install --upgrade pip
-.\.venv\Scripts\python.exe -m pip install -r backend/requirements-dev.lock
-.\.venv\Scripts\python.exe -m pip install --no-deps -e "./backend[dev]"
-```
-
-`pyproject.toml` centralitza metadades, dependències directes i configuració de
-pytest. L'extra `dev` afegeix les eines de tests. El mode editable (`-e`)
-permet importar `app` mentre s'edita el codi, sense reinstal·lar cada canvi.
-El fitxer `requirements-dev.lock` fixa també les dependències transitives;
-no conté rutes locals. Quan s'actualitzin dependències cal regenerar-lo i
-tornar a provar. No és una garantia de compatibilitat amb totes les versions
-futures de Python o tots els sistemes operatius.
-
-Per resoldre dependències de nou, sense utilitzar el lock:
-`python -m pip install -e "./backend[dev]"`.
-
-## Executar i provar
-
-Des de l'arrel, amb l'entorn activat:
-
-```sh
-python -m uvicorn app.main:app --reload
-python -m pytest backend/tests
-python -m pip check
-```
-
-El servidor ocupa el terminal: executa els tests en un altre terminal amb el
-mateix entorn. Atura'l amb Ctrl+C. A Windows, substitueix `python` per
-`.\.venv\Scripts\python.exe` si no has activat l'entorn.
-
-Obre http://127.0.0.1:8000/docs per provar els endpoints amb Swagger UI.
-`GET /health` ha de retornar 200 i `{"status": "ok"}`.
-Per al xat, envia aquest JSON a `POST /chat`:
-
-```json
-{"message": "Hola"}
-```
-
-Resposta esperada (200): `{"response": "Has dit: Hola"}`.
-Sense `message`, o amb un número en lloc de text, la resposta és 422.
-El servidor local escolta a localhost; no és un desplegament de producció.
-
-## Documentació
-
-- [Visió arquitectònica](docs/architecture/overview.md)
-- [Backend i flux HTTP](docs/architecture/backend.md)
-- [Mòdul de xat](docs/modules/chat.md)
-- [Decisió Python + FastAPI](docs/decisions/001-backend-fastapi.md)
-- [Roadmap](docs/roadmap.md)
-- [Registre d'aprenentatge](docs/learning/learning-log.md)
-- [Conceptes](docs/learning/concepts.md)
-- [Normes de desenvolupament](AGENTS.md)
+Els documents descriuen **intenció**, no certifiquen funcionalitats implementades. La font de veritat del codi és el repositori i les proves. Les integracions externes s'han de validar amb experiments abans de considerar-les disponibles.
