@@ -1,10 +1,13 @@
 # Visió de producte — Jarvis
 
-Estat: **acordat funcionalment; arquitectura en validació**. Data: 2026-11-08.
+Estat: **acordat funcionalment; arquitectura mínima aprovada; validació operativa pendent**. Data: 2026-11-08.
 
 ## Missió
 
 Un sistema personal que conserva el context de la vida quotidiana, organitza compromisos i projectes, registra dades pròpies i fa seguiment proactiu perquè l'usuari no hagi de recordar-ho tot ni repetir informació entre converses.
+
+Tots els àmbits següents són objectius de producte. La seva presència aquí no
+implica implementació ni autorització del següent mòdul.
 
 ## Experiència desitjada
 
@@ -37,7 +40,7 @@ Un sistema personal que conserva el context de la vida quotidiana, organitza com
 - Sense ordinador personal encès permanentment.
 - Accés web i iPhone.
 - Aprenentatge real d'arquitectura, dades, backend, seguretat i integració IA.
-- Preferència per JavaScript; backend i hosting pendents de validació i aprovació. El prototip anterior s'ha retirat segons D009.
+- Arquitectura mínima aprovada: vegeu [decisions](DECISIONS.md). Estat executable i límits de l’increment a [CURRENT_STATE](CURRENT_STATE.md).
 
 ## Criteris d'èxit del primer lliurable
 

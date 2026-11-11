@@ -1,4 +1,35 @@
-# Model de dades conceptual (no és encara un esquema SQL)
+# Model de dades
+
+## Esquema del primer increment
+
+Definit a `migrations/001_projects.sql`; aplicació i verificació real a
+[CURRENT_STATE](CURRENT_STATE.md). Una taula `projects`:
+
+| Camp | Tipus i regla |
+| --- | --- |
+| id | UUID, PK generada al servei |
+| owner_id | UUID NOT NULL, derivat del token; sense taula d'usuaris |
+| name | varchar(200), NOT NULL, no buit |
+| description | varchar(2000), NOT NULL, per defecte buit |
+| status | text, només `active` en aquest increment |
+| created_at / updated_at | timestamptz, NOT NULL, per defecte now() |
+| idempotency_key | varchar(128), nullable; format ASCII acotat |
+| request_hash | SHA-256 hexadecimal, NOT NULL; contingut canònic validat |
+
+UNIQUE(owner_id, idempotency_key) garanteix una sola fila per clau del propietari;
+els NULL no es dedupliquen. La mateixa fila conserva projecte i idempotència.
+El replay no modifica contingut ni dates. No hi ha retenció, eliminació o edició
+implementades. Semàntica pública al [contracte API](API_CONTRACT.md).
+
+## Metadades operatives de migració
+
+`jarvis_migrations`: version (PK), sha256 i applied_at. Només accessible al rol
+migrador, no al runtime; registra la revisió 001 atòmicament amb l'esquema quan
+s'utilitza `npm run db:migrate`. No és una funcionalitat d'usuari.
+Còpia/restauració a [DEVELOPMENT](DEVELOPMENT.md), decisions D018–D019.
+
+## Model conceptual futur (no implementat)
+
 
 ## Nucli proposat
 
@@ -28,4 +59,4 @@
 
 ## Pendent de decidir
 
-Motor de DB, autentificació, migracions, estratègia de cerca, dades privades i política de retenció. Evitar comprometre taules definitives abans del primer circuit funcional.
+Per a ampliacions: cerca, retenció, eliminació, procedència detallada i models específics. Motor i autenticació inicials aprovats a D011–D014; no crear les taules conceptuals anticipadament.

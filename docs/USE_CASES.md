@@ -1,5 +1,8 @@
 # Casos d'ús i acceptació
 
+Aquests casos descriuen la visió completa futura. L’increment aprovat és només
+crear/recuperar projectes: vegeu [CURRENT_STATE](CURRENT_STATE.md) i els contractes.
+
 ## UC-01 — Crear un projecte conversant
 
 Usuari: «Crea un projecte per muntar una bicicleta. He de comparar rodes i transmissió.»

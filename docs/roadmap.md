@@ -1,23 +1,25 @@
 # Full de ruta orientat a experiments
 
-## Estat actual — 2026-11-09
+## Estat actual — 2026-11-11
 
-Auditoria del prototip completada: 11 tests passaven abans de la conversió.
-Conversió autoritzada completada: documentació i prompts integrats a l'arrel;
-prototip i pla anterior retirats. No hi ha funcionalitats implementades en la
-nova direcció. Vegeu D009 a `DECISIONS.md`.
+D021 autoritza la publicació de desenvolupament i la preparació de Claude Code.
+Worker publicat; HTTPS i circuit API/MCP→Neon remots verificats. Claude Code i CPU pendents.
+La nova aprovació de publicació esmentada a la fase 0 ja s'ha rebut.
+
+Estat executable i verificacions a [CURRENT_STATE.md](CURRENT_STATE.md).
 
 ## Fase 0 — Decisions i experiments
 
-- Auditoria i conversió documental completades; proves del prototip retirades.
-- Pendent: concretar i aprovar el primer increment de projectes.
-- Validar MCP i autenticació en el client Codex disponible; verificar separadament els dispositius objectiu.
-- Triar backend/DB/hosting amb proves de cost, disponibilitat i auth.
-- Documentar decisions a `DECISIONS.md`.
+- Auditoria i conversió completades.
+- Arquitectura mínima i primer increment aprovats: D011–D014.
+- Primer increment crear/recuperar implementat i verificat localment; evidència i
+  límits a [CURRENT_STATE](CURRENT_STATE.md). Preparació Neon Free autoritzada
+  a D017; connexió, migració, permisos i restauració Neon remots verificats,
+  inclòs API/MCP via Worker local i públic. Publicació
+  autoritzada a D021 i executada. La fase no es declara tancada per proves simulades.
+- Validar Codex posteriorment sense bloquejar les proves MCP de desenvolupament.
 
-**Sortida:** proposta curta d'arquitectura amb riscos i primer canvi de codi autoritzat.
-
-## Fase 1 — Circuit complet de projectes
+## Fase 1 — Circuit complet de projectes (objectiu futur)
 
 - Projectes, tasques i decisions persistents.
 - API i MCP autenticats amb 4–8 eines essencials.
@@ -57,4 +59,4 @@ nova direcció. Vegeu D009 a `DECISIONS.md`.
 
 Chatbot propi, multiagents, RAG vectorial, sincronització genèrica universal, automatitzacions amb LLM sempre actiu.
 
-Client inicial: Codex segons D010; Claude queda ajornat, sense bloquejar la fase 0.
+Client inicial: Codex segons D010; Claude Code disponible i preparat segons D021, pendent de validació real.

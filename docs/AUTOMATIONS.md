@@ -1,4 +1,6 @@
-# Automatitzacions i seguiment
+# Automatitzacions i seguiment — objectius futurs
+
+No implementat ni inclòs en l’increment actual. Estat a [CURRENT_STATE](CURRENT_STATE.md).
 
 ## Canal
 
