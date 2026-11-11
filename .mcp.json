@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "jarvis": {
+      "type": "http",
+      "url": "https://jarvis.jarvis-joancardonall.workers.dev/mcp",
+      "headers": {
+        "Authorization": "Bearer ${JARVIS_BEARER_TOKEN}"
+      }
+    }
+  }
+}

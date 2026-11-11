@@ -1,0 +1,38 @@
+{
+  "name": "jarvis",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "scripts": {
+    "dev": "wrangler dev --ip 127.0.0.1 --port 8787",
+    "test": "node --test tests/app.test.js tests/ops-unit.test.js",
+    "test:postgres": "node --test tests/postgres.test.js",
+    "check": "node scripts/check.js",
+    "build": "wrangler deploy --dry-run --outdir dist",
+    "token": "node scripts/token.js",
+    "test:worker": "node --test tests/worker.test.js",
+    "ops:provision": "node scripts/provision.js",
+    "db:migrate": "node scripts/db.js migrate",
+    "db:verify": "node scripts/db.js verify",
+    "db:backup": "node scripts/db.js backup",
+    "db:restore": "node scripts/db.js restore",
+    "test:ops": "node --test tests/ops.test.js",
+    "dev:verify-neon": "node scripts/verify-neon.js",
+    "dev:verify-worker-neon": "node scripts/verify-neon.js --worker",
+    "dev:verify-remote": "node scripts/verify-neon.js --remote"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "@neondatabase/serverless": "1.2.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "pg": "8.16.3",
+    "wrangler": "4.158.0",
+    "@neon/config": "1.13.0",
+    "@neon/env": "2.1.0"
+  }
+}

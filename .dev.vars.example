@@ -1,0 +1,8 @@
+# Copy to .dev.vars (ignored). Generate your own credentials with npm run token.
+# Never paste real credentials in chat or commit them.
+DATABASE_URL="postgresql://runtime:REPLACE_ME@YOUR_NEON_HOST/jarvis?sslmode=require"
+DEV_TOKEN_SHA256="REPLACE_WITH_GENERATED_SHA256"
+DEV_OWNER_ID="REPLACE_WITH_GENERATED_UUID"
+DEV_TOKEN_EXPIRES_AT="REPLACE_WITH_GENERATED_EXPIRY"
+# Exact origin, no trailing slash. Empty forbids browser Origin headers.
+ALLOWED_ORIGIN=""
