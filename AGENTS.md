@@ -1,14 +1,47 @@
-# Instruccions per a Codex — Jarvis
+# Instruccions per a agents d'IA — Jarvis
+
+S'apliquen a qualsevol agent (Codex, Claude Code o altres).
+
+## Estil de resposta (obligatori)
+
+Respostes clares, properes i fàcils de seguir, pensades per a TDAH i per a una
+persona amb poca experiència que està aprenent mentre desenvolupa el projecte.
+Mantén un estil directe, amb prou explicació per entendre què fem i per què.
+
+- Comença amb la resposta o conclusió principal i desenvolupa el context necessari.
+- Fes servir paràgrafs curts i connectats. Reserva les llistes per a passos,
+  pendents o comparacions; evita respostes telegràfiques o excessivament seques.
+- No pressuposis coneixements d'arquitectura, backend, bases de dades, seguretat
+  o desplegament. Explica breument els termes tècnics i les sigles quan apareguin
+  per primer cop o quan siguin necessaris per entendre una decisió.
+- Relaciona cada concepte amb Jarvis i, quan ajudi, posa un exemple petit i concret.
+  No et limitis a donar una definició: explica per a què ens serveix.
+- Quan proposis o executis un canvi, explica què resol, per què el fem i com
+  comprovem que funciona. Quan donis una ordre, indica on executar-la, què fa
+  i quin resultat s'espera, sense exposar secrets.
+- Inclou directament les explicacions necessàries; no obliguis l'usuari a demanar
+  més detall per poder seguir el fil. Evita també repetir conceptes ja confirmats
+  com a compresos o afegir teoria que no ajuda a la tasca actual.
+- Dona una recomanació clara i explica'n el motiu. Presenta alternatives quan
+  impliquin una decisió real o un compromís que l'usuari hagi d'entendre.
+- Distingeix què s'ha fet, què s'ha comprovat i què queda pendent. Explica els
+  errors en llenguatge planer i no presentis una possible causa com a confirmada.
+- Destaca en **negreta** només les idees principals, decisions i accions.
+- Acaba amb **un** següent pas clar quan n'hi hagi, explicant què permetrà validar.
+- Mantén els informes obligatoris (fitxers, proves, riscos) llegibles i proporcionats
+  al canvi, sense imposar una sola línia si això impedeix entendre'ls.
 
 ## Context obligatori
 
-Abans de treballar, llegeix `README.md`, `docs/PRODUCT_VISION.md`, `docs/roadmap.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS.md` i els documents rellevants per a la tasca.
+Abans de començar una tasca, consulta `docs/PRODUCT_VISION.md`,
+`docs/CURRENT_STATE.md`, `docs/DECISIONS.md` i la documentació específica
+afectada. Consulta també `README.md` i `docs/roadmap.md` per executar i planificar.
 
 ## Principis
 
 - Treballa per increments petits, comprovables i reversibles.
 - No canviïs stack, hosting, DB o arquitectura sense proposta explícita i aprovació de l'usuari.
-- La visió de `docs/PRODUCT_VISION.md` substitueix el pla anterior de chatbot/Ollama. El prototip s'ha retirat; no hi ha stack d'execució escollit.
+- La visió de `docs/PRODUCT_VISION.md` substitueix el pla anterior de chatbot/Ollama. El prototip s'ha retirat; l'arquitectura mínima està aprovada a D011–D014.
 - No afegeixis frameworks, serveis de pagament, agents o embeddings sense justificació.
 - Separa domini, adaptadors HTTP/MCP, persistència i integracions; evita abstraccions prematures.
 - No suposis que l'accés a Codex inclou crèdits API ni execució autònoma del backend.
@@ -60,3 +93,36 @@ Proves per a regles de negoci, validació d'entrades, idempotència, dates i err
   ordres exactes, resultats i limitacions. Actualitzar documentació, roadmap i
   `docs/learning/learning-log.md`; fer tres preguntes breus de comprensió.
 - No marcar cap concepte com a après sense confirmació del desenvolupador.
+
+## Documentació com a font de veritat permanent
+
+La documentació Markdown del repositori és la font de veritat del projecte:
+intenció, decisions, contractes i estat. S'ha de mantenir sincronitzada amb el
+codi i les proves; si discrepen, informa'n i corregeix la discrepància sense
+presentar la documentació com a prova d'una funcionalitat.
+
+1. Abans de cada tasca, llegeix visió, estat actual, decisions i documents afectats.
+2. Registra cada decisió arquitectònica important a `docs/DECISIONS.md` amb
+   justificació, alternatives descartades i conseqüències.
+3. Cada funcionalitat implementada actualitza els documents corresponents:
+   arquitectura, dades, contractes MCP/API, seguretat o automatitzacions.
+4. `docs/CURRENT_STATE.md` reflecteix què funciona, què està pendent, què està
+   bloquejat i quin és el següent increment aprovat, amb evidència real.
+5. Actualitza `docs/roadmap.md` quan es completa una fase o canvien prioritats.
+   Aquest és el nom canònic del ROADMAP; no creïs una variant en majúscules.
+6. Distingeix sempre **proposat**, **aprovat**, **implementat** i **verificat**.
+   No presentis funcionalitats futures com si ja funcionessin.
+7. Cada tema té un document principal; els altres hi enllacen sense duplicar
+   explicacions: visió a PRODUCT_VISION, estat a CURRENT_STATE, decisions a
+   DECISIONS, estructura a ARCHITECTURE, dades a DATA_MODEL, contractes a
+   API_CONTRACT/MCP_CONTRACT, seguretat a SECURITY_PRIVACY, processos futurs
+   a AUTOMATIONS i seqüència a roadmap (tots sota `docs/`).
+8. Cada tasca inclou, quan correspon, documentació i proves com a criteris de
+   finalització. Proves simulades, integració local i proveïdor real es distingeixen.
+9. Abans d'acabar, informa dels fitxers modificats, proves executades, decisions
+   pendents i riscos detectats.
+10. No canviïs decisions aprovades ni l'abast del producte sense consultar l'usuari.
+
+La visió completa inclou memòria personal, projectes, tasques, universitat,
+entrenaments, integracions i seguiment proactiu per Telegram. Només crear i
+recuperar projectes està autoritzat per a l'increment actual; vegeu CURRENT_STATE.
