@@ -40,4 +40,6 @@ arrenca en loopback; sense secrets, només salut és operativa.
 La documentació Markdown és la font de veritat del projecte i s'ha de mantenir
 sincronitzada amb decisions, codi i proves. Es distingeixen proposat, aprovat,
 implementat i verificat. Les integracions i els desplegaments requereixen
-validació i permisos propis. Cap cost addicional, commit o push automàtic.
+validació i permisos propis. Cap cost addicional sense autorització. Commits a la
+branca de tasca permesos; merge i push amb aprovació segons el
+[flux Git](docs/GIT_WORKFLOW.md).

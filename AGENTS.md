@@ -59,7 +59,8 @@ afectada. Consulta també `README.md` i `docs/roadmap.md` per executar i planifi
 
 ## Restriccions operatives
 
-- No facis commit ni push automàtic sense ordre explícita.
+- Segueix [el flux de treball Git](docs/GIT_WORKFLOW.md). Pots fer commits a la
+  branca de la tasca; fusionar a main i fer push requereixen aprovació explícita.
 - No eliminis fitxers o dades, ni modifiquis infraestructura real sense confirmació.
 - No imprimeixis secrets ni incorporis credencials a repositori/logs.
 - No instal·lis dependències innecessàries; justifica cada nova dependència.
