@@ -4,7 +4,10 @@
 
 D021 autoritza la publicació de desenvolupament i la preparació de Claude Code.
 Worker publicat; HTTPS i circuit API/MCP→Neon remots verificats. Claude Code i CPU pendents.
-La nova aprovació de publicació esmentada a la fase 0 ja s'ha rebut.
+Publicació aprovada a D021 i executada. Flux Git i reconciliació documental aprovats.
+Ordre proposat per als següents increments: client conversacional i CPU,
+`list_projects`, tasques i resum Telegram. Cada implementació necessita aprovació
+del seu abast; la rotació real del token també queda pendent d’aprovació.
 
 Estat executable i verificacions a [CURRENT_STATE.md](CURRENT_STATE.md).
 

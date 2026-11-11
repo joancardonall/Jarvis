@@ -1,5 +1,35 @@
 # Registre d'aprenentatge
 
+## 2026-11-11 — Estat actual i flux Git
+
+Reconciliació documental aprovada: CURRENT_STATE presenta l'estat vigent, sense
+confondre errors històrics resolts amb bloquejos actuals. HTTPS i API/MCP remots
+verificats; CPU, client conversacional i rotació real pendents. Conservats els
+23 tests i la secció de renovació, corregint la pujada amb JSON i explicitant
+el risc de substitució parcial dels dos fitxers. No s'ha rotat cap secret.
+
+[Flux Git](../GIT_WORKFLOW.md): branca per tasca, un agent a la carpeta principal,
+worktrees si hi ha paral·lelisme, commits petits permesos a la branca; merge i
+push necessiten aprovació. Sense canvis d'arquitectura, domini o infraestructura.
+Comprovacions i limitacions comunicades en el tancament de la tasca.
+
+Preguntes de comprensió:
+1. Què ens permet revisar una branca abans de fusionar-la a main?
+2. Per què passar 23 tests sintètics no demostra una rotació remota real?
+3. Per què el token pot canviar mentre el propietari dels projectes es conserva?
+
+Cap concepte nou es marca com a après.
+
+## 2026-11-11 — Diagnòstic HTTPS i secrets de desplegament
+
+TLS ja funciona sense canvis: causa inicial desconeguda. Un 503 posterior en
+operacions BD s'ha resolt redesplegant el mateix codi amb secrets JSON explícits.
+Wrangler prioritza variables de procés en fitxers dotenv: un fitxer correcte no
+garanteix que el valor pujat sigui el mateix. JSON evita aquesta expansió.
+API/MCP remots i Neon passen amb dades fictícies; CPU i Claude Code pendents.
+Detall i evidència a [CURRENT_STATE](../CURRENT_STATE.md), procediment a
+[DEVELOPMENT](../DEVELOPMENT.md). Cap concepte nou confirmat com a après.
+
 ## 2026-11-11 — Worker remot i preparació Claude Code
 
 D021 autoritza publicació de desenvolupament i Claude Code. Mateixa arquitectura:

@@ -14,10 +14,20 @@ Ordres executades amb Node 22.22.0 i Wrangler fixat al projecte:
 ```sh
 npx wrangler login
 npx wrangler whoami
-npx wrangler deploy --secrets-file .dev.vars --message 'D021 development MCP and API; synthetic data only'
+npx wrangler deploy --secrets-file RUNTIME_JSON_PRIVATE_PATH --message 'D021 explicit runtime JSON secrets; avoid dotenv overrides'
 npx wrangler secret list
 npm run dev:verify-remote
 ```
+
+`RUNTIME_JSON_PRIVATE_PATH` és un marcador, no una ruta existent. El primer
+desplegament va usar `.dev.vars` directament; no repetir aquest format: Wrangler
+expandeix dotenv i prioritza variables de procés, incloses les carregades d'altres
+fitxers locals. Això pot substituir la URL runtime per una altra credencial.
+La correcció ha serialitzat exclusivament els cinc valors de `.dev.vars` a JSON
+en un directori temporal privat, amb fitxer 0600 i creació exclusiva. Ha validat
+rol `jarvis_runtime` i BD `jarvis_dev` abans de pujar-lo. JSON evita aquesta expansió.
+No copiar credencials manualment ni mostrar el fitxer. Conservar aquest format en
+futures publicacions i revisar sempre el destí; no usar secrets administratius.
 
 El compte està fixat a wrangler.jsonc. El subdomini de compte no existia i s'ha
 creat amb l'API oficial, només després de confirmar l'absència de scripts.
@@ -25,7 +35,11 @@ creat amb l'API oficial, només després de confirmar l'absència de scripts.
 o .env.local. Els cinc valors consten com a secret_text. Token actual caduca el
 16 de novembre de 2026; no s'ha regenerat ni sobreescrit cap secret local.
 La prova remota reutilitza les dues claus fictícies existents, sense duplicats.
-Primer intent: TLS handshake fallit, també amb curl; no implica prova API/MCP passada.
+Primer intent: TLS handshake fallit, també amb curl. Posteriorment HTTPS funciona
+sense canvis; després del redeploy amb secrets JSON, la prova remota completa passa.
+Causa exacta del TLS inicial no confirmada; configuració de secrets com a causa
+probable del 503 posterior. GET /health retorna 200; usar GET per provar salut,
+ja que `curl -I` envia HEAD i aquesta ruta no admet HEAD públic.
 
 ### Claude Code
 
@@ -52,7 +66,7 @@ claude
 
 Acceptar la configuració de projecte a Claude Code i consultar `/mcp`. No usar
 `claude -p` ni executar un model automàticament per aquesta comprovació.
-Després de verificar TLS, demanar crear un projecte fictici amb clau estable i
+Amb TLS ja verificat, demanar crear un projecte fictici amb clau estable i
 recuperar-lo pel seu UUID en una conversa nova. Sense resposta d'èxit de l'eina,
 no considerar-lo desat. No donar permisos generals d'escriptura automàtica.
 No s'ha localitzat `claude` al PATH d'aquesta sessió; el client real queda pendent.
@@ -67,13 +81,29 @@ cap secret. Si falta configuració vàlida, falla sense tocar res.
 
 ```sh
 npm run token:rotate
-npx wrangler deploy --secrets-file .dev.vars --message 'Rotate development token'
+npx wrangler deploy --secrets-file RUNTIME_JSON_PRIVATE_PATH --message 'Rotate development token'
 ```
+
+Aquestes ordres són el pla, no una autorització per executar-les. La rotació real
+continua pendent d'aprovació. Abans de rotar, conservar una còpia privada i
+recuperable de .dev.vars i .env.client. Després, comprovar que owner i URL runtime
+es conserven i preparar JSON privat amb els cinc valors nous segons l'apartat de
+publicació; el marcador RUNTIME_JSON_PRIVATE_PATH s'ha de substituir per aquest
+fitxer. No pujar .dev.vars directament ni mostrar secrets.
+
+Les dues substitucions locals són successives, no una operació atòmica conjunta:
+si falla la segona, pot quedar una parella inconsistent. Recuperar els dos fitxers
+coherents de la còpia abans de continuar. No reexecutar a cegues.
 
 La segona ordre actualitza els secrets del Worker publicat; fins llavors el
 remot només accepta el token antic. Després, recarregar `.env.client` i
 reiniciar Claude Code (vegeu l'apartat anterior). `npm run token` continua
 reservat a la configuració inicial i mai sobreescriu fitxers.
+Validar el token nou recuperant projectes existents i comprovant que el vell
+retorna 401. Si el desplegament falla o la resposta es perd, no assumir quin
+token accepta el remot: comprovar la versió activa i les credencials abans de
+restaurar o repetir. La prova sintètica no acredita
+rotació real, desplegament ni recuperació davant errors de fitxer.
 
 Fonts oficials consultades: [Claude Code MCP](https://code.claude.com/docs/en/mcp),
 [desplegament i secrets](https://developers.cloudflare.com/workers/wrangler/commands/workers/)
@@ -136,8 +166,9 @@ SQL que producció amb un adaptador pg transaccional; no prova el servei Neon re
 ## Preparació externa autoritzada — D017
 
 Autoritzats: comptes Free, projecte Neon UE, rols mínims, migració, dades
-fictícies, connexió/persistència i prova de restauració. **No** s'ha autoritzat
-publicar cap Worker, dades personals, upgrades, targetes o recursos de pagament.
+fictícies, connexió/persistència i prova de restauració. La publicació de desenvolupament s’ha autoritzat posteriorment a D021 i ja
+està executada. Dades personals, upgrades, targetes i recursos de pagament
+continuen fora de l’abast.
 L'estat real de cada acció es consulta a [CURRENT_STATE](CURRENT_STATE.md).
 
 ### Flux CLI executat per petició de l'usuari
@@ -172,9 +203,9 @@ la ruta alternativa si es torna a configurar un entorn, no feina encara pendent.
 ### 1. Panells, accions manuals
 
 **Cloudflare:** entrar al compte propi, consultar Workers & Pages i confirmar el
-pla Workers Free. No prémer Deploy/Create Worker, no connectar Git per autodeploy,
-no activar dominis, Paid, cron ni serveis opcionals. Preparar el compte no exigeix
-publicar un script. Els tokens d'eines connectades al xat no s'utilitzen.
+pla Workers Free. La preparació inicial no exigia publicar un script; D021 ja ha autoritzat
+i executat la publicació. No connectar Git per autodeploy ni activar dominis,
+Paid, cron o serveis opcionals. Els tokens d'eines connectades al xat no s'utilitzen.
 
 **Neon:** crear projecte `jarvis-dev` en Free, AWS Frankfurt (UE,
 `aws-eu-central-1`), PostgreSQL 17 o 18, sense serveis opcionals. Londres no és UE.
@@ -272,8 +303,8 @@ npm run dev:verify-worker-neon
 Aquesta ordre llegeix el token de `.env.client` sense imprimir-lo i prova API/MCP
 contra el Worker local a 127.0.0.1:8787 i Neon real. Sense `--worker`,
 `npm run dev:verify-neon` prova el mateix servei en Node amb l'adaptador Neon.
-No requereix que l'usuari copiï cap token a arguments ni a la línia de comandes. No usar `wrangler dev --remote` ni `wrangler deploy`.
-`workers_dev: false` i `preview_urls: false` es mantenen.
+No requereix que l'usuari copiï cap token a arguments ni a la línia de comandes. Per aquesta prova local no usar `wrangler dev --remote` ni desplegar.
+La configuració actual pública és `workers_dev: true` i `preview_urls: false`.
 
 Inspector és opcional; les proves automàtiques utilitzen el SDK oficial.
 La versió consultada 2.14.0 exigeix Node `^22.23.4 || ^24.22.1 || >=26.12.1`,
@@ -305,17 +336,17 @@ La confirmació del pla al panell és necessària: la guia no acredita l'estat d
 Fonts: [Workers](https://developers.cloudflare.com/workers/platform/limits/) i
 [Neon](https://neon.com/pricing). No es promet disponibilitat contínua gratuïta.
 
-## Preparació de la mesura de CPU — sense publicació
+## Mesura de CPU — pendent amb Worker ja publicat
 
 No s'ha mesurat CPU de Cloudflare. La durada total d'una petició amb BD i la CPU
 no són equivalents; ni timings de Node ni un perfil local donen aquesta garantia.
 El límit Workers Free consultat és 10 ms de CPU/invocació i 100.000 peticions/dia.
 [Font oficial](https://developers.cloudflare.com/workers/platform/limits/).
 
-Pla preparat per quan s'autoritzi una versió de desenvolupament remota:
+Pla de prova acotada sobre la versió de desenvolupament autoritzada a D021:
 
 1. Confirmar pla Free, només dades fictícies, permisos, TLS, restauració i absència
-   de secrets en logs; obtenir nova aprovació de l'endpoint i accessos.
+   de secrets en logs; mantenir l’endpoint i els accessos autoritzats a D021.
 2. Anotar versió desplegada, data i finestra de prova. Fer una sèrie limitada
    (p. ex. 20 operacions per cas), sense càrrega continuada: salut, auth invàlida,
    crear sense clau, crear amb replay, recuperar, MCP initialize/list/call.
@@ -328,7 +359,7 @@ Pla preparat per quan s'autoritzi una versió de desenvolupament remota:
    No activar Paid ni modificar el stack silenciosament per fer passar el test.
 
 La mètrica de CPU del proveïdor requereix execució remota autoritzada i compte
-configurat; queda pendent per respectar la prohibició actual de publicació.
+configurat; publicació autoritzada i executada, mesura encara no executada.
 [Documentació de mètriques](https://developers.cloudflare.com/workers/observability/metrics-and-analytics/).
 
 ## Dependències i comprovacions

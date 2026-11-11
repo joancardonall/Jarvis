@@ -13,24 +13,20 @@ D017 autoritza preparar recursos Free, migrar i provar recuperació amb dades
 fictícies. D021 autoritza publicar el Worker de desenvolupament i preparar la
 connexió amb Claude Code, ara disponible; només dades fictícies i pla Free.
 
-## Publicació autoritzada — 2026-11-11
+## Estat operatiu
 
-- Revisió del codi coherent amb l'abast documentat; `npm run check`, `npm test`
-  (22/22) i `npm run build` repetits correctament.
-- URL local configurada amb rol `jarvis_runtime` i BD `jarvis_dev`; token vigent
-  fins al 2026-11-16. Cap secret imprès.
-- Login OAuth oficial completat. Compte fixat a wrangler.jsonc; no hi havia scripts previs.
-- Worker publicat: https://jarvis.jarvis-joancardonall.workers.dev
-  Versió `9502a89d-20ca-4bae-89b2-00ffa4532fe1`. Ruta activa i previews desactivats.
-- Cinc secrets runtime confirmats amb `wrangler secret list`, sense valors exposats.
-- `npm run test:worker`: 1/1 correcte. Verificació remota intentada: handshake
-  TLS fallit tant amb Node com curl; activació del certificat és una hipòtesi.
-  API/MCP remots, CPU i Claude Code encara no verificats.
-- Subscripcions: API retorna 403; pla Free confirmat anteriorment per l’usuari,
-  sense nova verificació de billing per API ni activació de serveis de pagament.
-- `.mcp.json` preparat amb variable d’entorn, sense token.
-- Les referències a una nova aprovació de publicació als apartats històrics
-  següents queden substituïdes per D021; publicació ja executada.
+- Worker publicat segons D021: https://jarvis.jarvis-joancardonall.workers.dev
+  Versió verificada: `e732a654-a740-476d-8430-20817b7ba315`.
+- HTTPS i circuit API/MCP→Neon verificats amb SDK oficial i dades fictícies.
+  No hi ha bloqueig TLS actual. CPU i clients conversacionals encara pendents.
+- Compte Cloudflare verificat amb login OAuth propi; previews i observability
+  desactivats. Cinc secrets runtime protegits, rol `jarvis_runtime`, BD `jarvis_dev`.
+- Pla Cloudflare Free confirmat per l'usuari; API de subscripcions retorna 403,
+  sense verificació independent de billing. Cap upgrade activat.
+- Token actual caduca el 2026-11-16. Rotació real pendent d'aprovació separada.
+- Secrets pujats amb JSON privat per evitar substitucions dotenv de Wrangler.
+  Diagnòstic històric al [registre d'aprenentatge](learning/learning-log.md).
+- `.mcp.json` preparat amb variable d'entorn, sense token versionat.
 
 ## Implementat
 
@@ -106,22 +102,22 @@ Els projectes d'Ohio i l'ID diferent del prompt no s'han connectat ni modificat.
 | npm run db:migrate | Migration 001 and runtime table grants verified |
 | npm run db:verify | Runtime connection and minimum permissions verified |
 | npm run token | Credencials desades privadament, cap token imprès |
+| npm run dev:verify-remote | HTTPS, auth absent/invàlida, origen prohibit, descoberta de dues eines, API→MCP i MCP→API amb persistència real |
 | npm run dev:verify-neon | API/MCP cross-read, fresh app instance and real Neon persistence verified from Node |
 | npm run db:backup | Logical projects snapshot saved privately |
 | npm run db:restore | Restore into empty jarvis_restore verified against snapshot checksum |
 | npm run build | Dry-run correcte; 1629,40 KiB / gzip 298,44 KiB; no desplegament |
 | npm run dev + npm run dev:verify-worker-neon | API/MCP cross-read and real Neon persistence verified through local workerd HTTP |
 
-S'ha arrencat el Worker **només a 127.0.0.1:8787**, i després s'ha aturat.
+La prova local va arrencar el Worker a **127.0.0.1:8787** i el va aturar després.
+El Worker públic també està desplegat i verificat segons l’estat operatiu anterior.
 La prova cobreix HTTP i MCP amb el client SDK real contra workerd i Neon, sense LLM.
 Els timings que Wrangler imprimeix són durada de petició, **no CPU del proveïdor**.
 
 ## Què continua pendent
 
-- Worker públic desplegat segons D021; HTTPS i API/MCP→Neon verificats.
-  Preview URLs desactivats. Compte verificat per CLI; billing API sense permisos.
 - Mesura de CPU a Cloudflare: pla preparat a DEVELOPMENT, encara no executat.
-- Disponibilitat remota del backend, reactivació després d'inactivitat sostinguda,
+- Disponibilitat remota sostinguda, reactivació després d'inactivitat sostinguda,
   límits reals sota càrrega i clients MCP conversacionals finals pendents.
 - Windows, Inspector manual, Codex i Claude com a clients de Jarvis no verificats.
 - La còpia només cobreix projects i migració coneguda: no és pg_dump complet,
@@ -139,7 +135,10 @@ aquests scripts rebutgen sobreescriure fitxers o bases ja ocupats.
 Publicació autoritzada i executada segons D021. Següent pas: mesurar
 el consum de CPU i connectar Claude Code. HTTPS i `npm run dev:verify-remote` ja passen.
 No habilitar autodeploy. Les dades personals continuen prohibides.
-Guia i ordres a [DEVELOPMENT](DEVELOPMENT.md).
+Guia i ordres a [DEVELOPMENT](DEVELOPMENT.md). La reconciliació documental i el
+[flux Git](GIT_WORKFLOW.md) estan aprovats; rotació real i implementació de
+`list_projects` requereixen aprovació separada. Sense llistat, un xat nou encara
+necessita conèixer l’UUID del projecte.
 
 ## Objectius futurs
 

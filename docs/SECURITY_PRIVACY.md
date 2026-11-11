@@ -19,8 +19,9 @@ No hi ha CORS web, rate limiter distribuït, OAuth o login web. Cos màxim 16 Ki
 No registrar cossos, tokens ni URL de connexió. Dades fictícies exclusivament.
 No hi ha endpoints per esborrar ni exportar dades personals.
 
-Secrets a `.dev.vars` ignorat localment i al gestor de secrets de Cloudflare quan
-s'autoritzi desplegar. El token es desa a `.env.client` i no s'imprimeix;
+Secrets a `.dev.vars` ignorat localment i al gestor de secrets de Cloudflare
+del Worker ja publicat segons D021. Pujar-los amb JSON privat, sense expansió
+dotenv; procediment a [DEVELOPMENT](DEVELOPMENT.md). El token es desa a `.env.client` i no s'imprimeix;
 no s'ha de copiar al xat, URL, historial Git o línia d'ordres compartida.
 Les credencials fixes dels tests són fictícies i no són aptes per desplegar.
 El CLI Neon baixa credencial administrativa a `.env.local`: fitxer privat, ignorat,
@@ -30,7 +31,7 @@ D017 autoritza recursos Free i migracions remotes de desenvolupament; D021
 autoritza la publicació executada el 2026-11-11 amb secrets runtime protegits. Abans de l’accés remot: backup/restauració provats; abans de dades
 personals també cal revisar retenció i controls d’abús. La finestra de
 recuperació gratuïta no substitueix còpies independents. Restauració acotada a projects provada
-localment i sobre Neon en BD separada; no equival a recuperació completa del compte. Configuració pendent a
+localment i sobre Neon en BD separada; no equival a recuperació completa del compte. Guia de configuració a
 [DEVELOPMENT](DEVELOPMENT.md), evidència a [CURRENT_STATE](CURRENT_STATE.md).
 
 ## Requisits futurs abans de producció
