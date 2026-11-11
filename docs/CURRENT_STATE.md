@@ -30,7 +30,7 @@ connexió amb Claude Code, ara disponible; només dades fictícies i pla Free.
   sense nova verificació de billing per API ni activació de serveis de pagament.
 - `.mcp.json` preparat amb variable d’entorn, sense token.
 - Les referències a una nova aprovació de publicació als apartats històrics
-  següents queden substituïdes per D021; queda pendent executar-la.
+  següents queden substituïdes per D021; publicació ja executada.
 
 ## Implementat
 
@@ -44,6 +44,8 @@ connexió amb Claude Code, ara disponible; només dades fictícies i pla Free.
   de privilegis, prova API/MCP amb Neon i còpia/restauració lògica de projects.
 - Generació de tokens en fitxers privats; ja no imprimeix secrets. Configuració
   administrativa, migració, runtime i client separades i ignorades per Git.
+- Renovació del token (`npm run token:rotate`) conservant l'owner; provada amb
+  fitxers sintètics. No s'ha executat sobre els secrets reals ni al Worker publicat.
 
 Contractes a [API](API_CONTRACT.md) i [MCP](MCP_CONTRACT.md), flux a
 [ARCHITECTURE](ARCHITECTURE.md), execució a [DEVELOPMENT](DEVELOPMENT.md).
@@ -55,7 +57,7 @@ No hi ha instal·lació global ni models d'IA.
 
 | Ordre | Resultat real | Abast |
 | --- | --- | --- |
-| npm test | 22/22 | Contractes anteriors i proteccions operatives: destí UE/TLS, corrupció, secrets i absència de sobreescriptura |
+| npm test | 23/23 | Contractes anteriors i proteccions operatives: destí UE/TLS, corrupció, secrets, absència de sobreescriptura i rotació de token amb mateix owner |
 | npm run test:postgres | 1/1 suite | Migració SQL real, API/MCP contra PostgreSQL, instància nova, 10 altes concurrents, rollback i constraints |
 | npm run test:worker | 1/1 | Runtime workerd, xarxa loopback, salut, autenticació i descoberta MCP amb client SDK oficial |
 | npm run test:ops | 1/1 suite | Clúster PostgreSQL independent, rols mínims, migració repetible, permisos negatius i restauració completa de projects |
@@ -116,7 +118,7 @@ Els timings que Wrangler imprimeix són durada de petició, **no CPU del proveï
 
 ## Què continua pendent
 
-- Worker públic desplegat segons D021; endpoint encara pendent de verificació TLS.
+- Worker públic desplegat segons D021; HTTPS i API/MCP→Neon verificats.
   Preview URLs desactivats. Compte verificat per CLI; billing API sense permisos.
 - Mesura de CPU a Cloudflare: pla preparat a DEVELOPMENT, encara no executat.
 - Disponibilitat remota del backend, reactivació després d'inactivitat sostinguda,
@@ -134,8 +136,8 @@ La preparació Free, migració, persistència i restauració remotes de l'increm
 han quedat verificades. No cal repetir ops:provision, token, backup o restore:
 aquests scripts rebutgen sobreescriure fitxers o bases ja ocupats.
 
-Publicació autoritzada i executada segons D021. Següent pas: resoldre/verificar
-TLS, executar `npm run dev:verify-remote`, mesurar CPU i connectar Claude Code.
+Publicació autoritzada i executada segons D021. Següent pas: mesurar
+el consum de CPU i connectar Claude Code. HTTPS i `npm run dev:verify-remote` ja passen.
 No habilitar autodeploy. Les dades personals continuen prohibides.
 Guia i ordres a [DEVELOPMENT](DEVELOPMENT.md).
 

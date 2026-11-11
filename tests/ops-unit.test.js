@@ -55,3 +55,43 @@ test('development token generator writes separate private files, never overwrite
     await assert.rejects(writeDevelopmentCredentials('unused', dir), /output_already_exists/);
   } finally { await rm(dir, { recursive: true }); }
 });
+
+test('token rotation keeps owner and settings, replaces token, and rejects the old one', async () => {
+  const { writeDevelopmentCredentials, rotateDevelopmentToken } = await import('../scripts/token.js');
+  const { authenticate } = await import('../src/auth.js');
+  const { parseEnv } = await import('node:util');
+  const { readdir, writeFile } = await import('node:fs/promises');
+  const dir = await mkdtemp(join(tmpdir(), 'jarvis-rotation-test-'));
+  const request = (token) => new Request('http://127.0.0.1/', { headers: { Authorization: `Bearer ${token}` } });
+  try {
+    await writeDevelopmentCredentials('postgresql://synthetic:synthetic@synthetic.example/jarvis_dev', dir);
+    const oldServer = parseEnv(await readFile(join(dir, '.dev.vars'), 'utf8'));
+    const oldClient = parseEnv(await readFile(join(dir, '.env.client'), 'utf8'));
+
+    const now = Date.now() + 86400000;
+    const { expiresAt } = await rotateDevelopmentToken(dir, now);
+    const server = parseEnv(await readFile(join(dir, '.dev.vars'), 'utf8'));
+    const client = parseEnv(await readFile(join(dir, '.env.client'), 'utf8'));
+
+    assert.equal(server.DEV_OWNER_ID, oldServer.DEV_OWNER_ID);
+    assert.equal(server.DATABASE_URL, oldServer.DATABASE_URL);
+    assert.equal(server.ALLOWED_ORIGIN, oldServer.ALLOWED_ORIGIN);
+    assert.notEqual(client.JARVIS_BEARER_TOKEN, oldClient.JARVIS_BEARER_TOKEN);
+    assert.equal(server.DEV_TOKEN_EXPIRES_AT, expiresAt);
+    assert.equal(Date.parse(expiresAt), now + 7 * 86400000);
+    assert.equal(await authenticate(request(client.JARVIS_BEARER_TOKEN), server), oldServer.DEV_OWNER_ID);
+    await assert.rejects(authenticate(request(oldClient.JARVIS_BEARER_TOKEN), server), { status: 401 });
+    if (process.platform !== 'win32') {
+      assert.equal((await stat(join(dir, '.dev.vars'))).mode & 0o777, 0o600);
+      assert.equal((await stat(join(dir, '.env.client'))).mode & 0o777, 0o600);
+    }
+    assert.deepEqual((await readdir(dir)).sort(), ['.dev.vars', '.env.client']);
+
+    // Broken existing config: refuse and leave files untouched.
+    await rm(join(dir, '.dev.vars'));
+    await writeFile(join(dir, '.dev.vars'), 'DEV_OWNER_ID="not-a-uuid"\n');
+    const clientBefore = await readFile(join(dir, '.env.client'), 'utf8');
+    await assert.rejects(rotateDevelopmentToken(dir), /invalid_existing_credentials/);
+    assert.equal(await readFile(join(dir, '.env.client'), 'utf8'), clientBefore);
+  } finally { await rm(dir, { recursive: true }); }
+});

@@ -57,6 +57,24 @@ recuperar-lo pel seu UUID en una conversa nova. Sense resposta d'èxit de l'eina
 no considerar-lo desat. No donar permisos generals d'escriptura automàtica.
 No s'ha localitzat `claude` al PATH d'aquesta sessió; el client real queda pendent.
 
+### Renovar el token
+
+El token caduca als 7 dies. `npm run token:rotate` en genera un de nou i
+substitueix només `DEV_TOKEN_SHA256` i `DEV_TOKEN_EXPIRES_AT` a `.dev.vars` i
+el token a `.env.client`. **Conserva `DEV_OWNER_ID`**, de manera que els projectes
+existents continuen visibles. El token antic deixa de ser vàlid. No imprimeix
+cap secret. Si falta configuració vàlida, falla sense tocar res.
+
+```sh
+npm run token:rotate
+npx wrangler deploy --secrets-file .dev.vars --message 'Rotate development token'
+```
+
+La segona ordre actualitza els secrets del Worker publicat; fins llavors el
+remot només accepta el token antic. Després, recarregar `.env.client` i
+reiniciar Claude Code (vegeu l'apartat anterior). `npm run token` continua
+reservat a la configuració inicial i mai sobreescriu fitxers.
+
 Fonts oficials consultades: [Claude Code MCP](https://code.claude.com/docs/en/mcp),
 [desplegament i secrets](https://developers.cloudflare.com/workers/wrangler/commands/workers/)
 i [subdomini Workers](https://developers.cloudflare.com/api/resources/workers/subresources/subdomains/methods/update/).

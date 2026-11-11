@@ -5,7 +5,7 @@
 Bearer token propi de 32 bytes aleatoris, generat localment amb `npm run token`.
 El client conserva el token; el Worker només necessita SHA-256, UUID del propietari
 i caducitat absoluta. Comparació de hashes sense sortida anticipada; configuració
-incompleta falla tancada. Rotació manual substituint el resum; un token per entorn,
+incompleta falla tancada. Rotació amb `npm run token:rotate`: nou resum i caducitat, mateix owner; un token per entorn,
 sense usuaris, rols o OAuth. Un token vàlid permet crear i llegir només el seu owner.
 La identitat es deriva de configuració segura del token, mai del client.
 
