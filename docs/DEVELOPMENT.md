@@ -32,8 +32,9 @@ futures publicacions i revisar sempre el destí; no usar secrets administratius.
 El compte està fixat a wrangler.jsonc. El subdomini de compte no existia i s'ha
 creat amb l'API oficial, només després de confirmar l'absència de scripts.
 `--secrets-file` puja només la configuració runtime; mai .env.ops, .env.database
-o .env.local. Els cinc valors consten com a secret_text. Token actual caduca el
-16 de novembre de 2026; no s'ha regenerat ni sobreescrit cap secret local.
+o .env.local. Els cinc valors consten com a secret_text. Aquell token caducava el
+16 de novembre de 2026; s’ha renovat posteriorment segons D022. Caducitat vigent
+i evidència a [CURRENT_STATE](CURRENT_STATE.md).
 La prova remota reutilitza les dues claus fictícies existents, sense duplicats.
 Primer intent: TLS handshake fallit, també amb curl. Posteriorment HTTPS funciona
 sense canvis; després del redeploy amb secrets JSON, la prova remota completa passa.
@@ -71,6 +72,25 @@ recuperar-lo pel seu UUID en una conversa nova. Sense resposta d'èxit de l'eina
 no considerar-lo desat. No donar permisos generals d'escriptura automàtica.
 No s'ha localitzat `claude` al PATH d'aquesta sessió; el client real queda pendent.
 
+### Claude web/app (connector remot)
+
+El connector configurat a Claude web/app és independent de `.mcp.json`, que és per
+Claude Code. L'URL és `https://jarvis.jarvis-joancardonall.workers.dev/mcp`.
+
+A Customize/Configuració → Connectors → Add custom connector:
+
+1. Nom Jarvis i URL anterior, inclòs `/mcp`.
+2. Autenticació sense login OAuth («No sign in» si apareix aquesta opció).
+   Això no elimina l'autenticació de Jarvis: la credencial viatja a la capçalera.
+3. A Request headers, afegir nom `Authorization` i valor `Bearer ` seguit del token
+   vigent del fitxer privat `.env.client`, sense cometes. No enviar-lo pel xat.
+4. Desar i comprovar que es descobreixen les dues eines. La confirmació del client
+   real es registra a CURRENT_STATE, no s'infereix de la documentació del proveïdor.
+
+La documentació de Claude permet credencials fixes per capçalera; si aquests camps
+no apareixen al compte, no improvisar OAuth ni posar el token a l'URL.
+[Guia oficial de connectors](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp).
+
 ### Renovar el token
 
 El token caduca als 7 dies. `npm run token:rotate` en genera un de nou i
@@ -81,15 +101,18 @@ cap secret. Si falta configuració vàlida, falla sense tocar res.
 
 ```sh
 npm run token:rotate
-npx wrangler deploy --secrets-file RUNTIME_JSON_PRIVATE_PATH --message 'Rotate development token'
+npx wrangler secret bulk TOKEN_JSON_PRIVATE_PATH --name jarvis --env-file /dev/null
 ```
 
-Aquestes ordres són el pla, no una autorització per executar-les. La rotació real
-continua pendent d'aprovació. Abans de rotar, conservar una còpia privada i
+La renovació del 18 de novembre està autoritzada i executada segons D022.
+Aquest procediment no autoritza futures rotacions automàticament. Abans de rotar,
+conservar una còpia privada i
 recuperable de .dev.vars i .env.client. Després, comprovar que owner i URL runtime
-es conserven i preparar JSON privat amb els cinc valors nous segons l'apartat de
-publicació; el marcador RUNTIME_JSON_PRIVATE_PATH s'ha de substituir per aquest
-fitxer. No pujar .dev.vars directament ni mostrar secrets.
+es conserven i preparar JSON privat amb només DEV_TOKEN_SHA256 i DEV_TOKEN_EXPIRES_AT;
+el marcador TOKEN_JSON_PRIVATE_PATH s’ha de substituir per aquest fitxer.
+En aquesta renovació s’ha utilitzat secret bulk, que conserva els altres secrets
+i el codi publicat. A Windows, emprar un fitxer buit local a --env-file en lloc
+de /dev/null. No repetir la publicació de codi per canviar només la credencial. No pujar .dev.vars directament ni mostrar secrets.
 
 Les dues substitucions locals són successives, no una operació atòmica conjunta:
 si falla la segona, pot quedar una parella inconsistent. Recuperar els dos fitxers

@@ -7,7 +7,8 @@ Worker publicat; HTTPS i circuit API/MCP→Neon remots verificats. Claude Code i
 Publicació aprovada a D021 i executada. Flux Git i reconciliació documental aprovats.
 Ordre proposat per als següents increments: client conversacional i CPU,
 `list_projects`, tasques i resum Telegram. Cada implementació necessita aprovació
-del seu abast; la rotació real del token també queda pendent d’aprovació.
+del seu abast; la renovació del token del 18 de novembre està autoritzada i executada (D022);
+la connexió de Claude web/app amb la nova credencial encara està pendent.
 
 Estat executable i verificacions a [CURRENT_STATE.md](CURRENT_STATE.md).
 

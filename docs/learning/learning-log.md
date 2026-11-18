@@ -160,3 +160,20 @@ Preguntes pendents de revisió educativa:
 3. Per què un temps de resposta de Wrangler no prova el consum de CPU de Cloudflare?
 
 Cap concepte nou es marca com a après sense confirmació de l'usuari.
+
+## 2026-11-18 — Renovació del token per a Claude web/app
+
+Diagnòstic: salut HTTPS correcta, credencial local caducada i initialize 401.
+L'usuari ha autoritzat D022. Primer login caducat; després ha completat el login
+Cloudflare des del terminal. 23 proves locals passen abans de la rotació.
+
+S'han conservat còpies privades, rotat token amb el mateix owner i actualitzat
+només hash/caducitat del Worker amb secret bulk en JSON, sense publicar codi nou.
+El token nou descobreix les dues eines i recupera els dos projectes existents
+sense canviar IDs, dades o dates; l'antic retorna 401. No s'ha escrit cap projecte.
+Estat i caducitat a [CURRENT_STATE](../CURRENT_STATE.md); procediment i capçalera
+per a Claude web a [DEVELOPMENT](../DEVELOPMENT.md). La prova al client Claude
+real queda pendent de l'usuari; no es dona per completada per la prova del SDK.
+
+Sense secrets al xat, logs o Git; sense canvis de pla o permisos. No s'afegeix OAuth.
+Cap concepte es marca com a après: l'usuari havia indicat dubtes a la revisió anterior.

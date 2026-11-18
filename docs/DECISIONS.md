@@ -204,3 +204,21 @@ existent preservat: no s'afegeix Hyperdrive ni ORM. Credencial administrativa
 baixada a .env.local usada només per preparació; runtime separat a .dev.vars.
 Pla revisat i deploy sense canvis, sense serveis addicionals o upgrades.
 Nova aprovació encara necessària per publicar Cloudflare. Evidència a CURRENT_STATE.
+
+
+## D022 — Renovació de credencial per a Claude web/app — 2026-11-18
+
+**Estat:** autoritzada i executada el 2026-11-18; nou token verificat amb SDK
+MCP oficial. Actualització del connector Claude web/app encara pendent de l’usuari.
+Evidència d’execució a CURRENT_STATE.
+**Decisió:** renovar el token temporal i la caducitat mantenint owner, BD i codi;
+actualitzar els dos secrets d'autenticació del Worker existent i preparar el
+connector de Claude web/app amb capçalera Bearer, sense introduir OAuth.
+**Justificació:** diagnòstic real: salut 200, token local caducat el 16 de novembre
+i initialize MCP amb aquesta credencial retorna 401. El servidor no està apagat.
+**Alternatives descartades:** eliminar autenticació, allargar el token antic,
+regenerar owner (perdria accés als projectes) o afegir OAuth fora d'abast.
+**Conseqüències:** còpia privada recuperable abans de substituir fitxers; revocació
+del token antic i nova caducitat de set dies. Login Cloudflare propi si cal;
+cap valor de token al xat, logs o Git. La connexió de Claude es verifica separadament
+de la prova del servidor amb el SDK. Sense canvis de producte, merge o push.

@@ -1,6 +1,6 @@
 # Estat actual
 
-Actualitzat: 2026-11-11. Document principal d'estat executable i evidència.
+Actualitzat: 2026-11-18. Document principal d'estat executable i evidència.
 Visió a [PRODUCT_VISION](PRODUCT_VISION.md), motius a [DECISIONS](DECISIONS.md).
 
 ## Aprovat
@@ -16,17 +16,43 @@ connexió amb Claude Code, ara disponible; només dades fictícies i pla Free.
 ## Estat operatiu
 
 - Worker publicat segons D021: https://jarvis.jarvis-joancardonall.workers.dev
-  Versió verificada: `e732a654-a740-476d-8430-20817b7ba315`.
+  Versió verificada: `1307721e-dda1-4faf-8265-bf6715f36fd0` (100%, secrets renovats el 2026-11-18).
 - HTTPS i circuit API/MCP→Neon verificats amb SDK oficial i dades fictícies.
   No hi ha bloqueig TLS actual. CPU i clients conversacionals encara pendents.
 - Compte Cloudflare verificat amb login OAuth propi; previews i observability
   desactivats. Cinc secrets runtime protegits, rol `jarvis_runtime`, BD `jarvis_dev`.
 - Pla Cloudflare Free confirmat per l'usuari; API de subscripcions retorna 403,
   sense verificació independent de billing. Cap upgrade activat.
-- Token actual caduca el 2026-11-16. Rotació real pendent d'aprovació separada.
+- D022 executada: token renovat el 2026-11-18, caduca el
+  **2026-11-25T17:57:36.599Z**. Propietari i BD conservats; token antic rebutjat.
+  El connector de Claude web/app encara necessita actualitzar la capçalera privada.
 - Secrets pujats amb JSON privat per evitar substitucions dotenv de Wrangler.
   Diagnòstic històric al [registre d'aprenentatge](learning/learning-log.md).
 - `.mcp.json` preparat amb variable d'entorn, sense token versionat.
+
+## Diagnòstic del connector Claude web/app — 2026-11-18
+
+- GET /health comprovat per HTTPS: 200 amb status ok.
+- initialize MCP amb la credencial local existent: 401; caducitat local confirmada.
+- La captura de Claude mostra Jarvis amb avís i Reconnect; el missatge és genèric
+  i no prova per si sol que el servidor estigui apagat.
+- L'usuari ha confirmat que és Claude web/app, no Claude Code, i ha autoritzat
+  la renovació a D022. La compatibilitat real del connector encara no està validada.
+- 23 proves locals passen; còpia privada recuperable dels dos fitxers preparada.
+- Primer login de l'agent caducat sense autorització; l'usuari ha completat després
+  el login des del seu terminal. Compte Cloudflare esperat comprovat abans de rotar.
+- Còpia privada coherent de .dev.vars i .env.client conservada a backups/ (ignorat).
+- token:rotate executat; verificació que owner, URL runtime i altres opcions no canvien.
+- Dos secrets actualitzats amb JSON privat via `wrangler secret bulk`:
+  DEV_TOKEN_SHA256 i DEV_TOKEN_EXPIRES_AT. No s'ha pujat codi, tocat permisos ni BD.
+- GET /health: 200; credencial absent i antiga: 401; credencial nova: initialize i
+  descoberta amb SDK oficial correctes, dues eines disponibles.
+- Recuperats per MCP els dos projectes ficticis existents: IDs, contingut i dates
+  iguals a la còpia coneguda. Prova només de lectura, sense crear cap projecte.
+- Desplegament de secrets: b20f63b1-453b-4630-add2-83b2037424d3;
+  versió activa al 100% indicada a l'estat operatiu. Cap canvi de codi del Worker.
+- Claude web/app encara pendent d'actualitzar Authorization i confirmar connexió.
+  La captura anterior és d'abans de la renovació; no acredita una prova posterior.
 
 ## Implementat
 
@@ -40,8 +66,8 @@ connexió amb Claude Code, ara disponible; només dades fictícies i pla Free.
   de privilegis, prova API/MCP amb Neon i còpia/restauració lògica de projects.
 - Generació de tokens en fitxers privats; ja no imprimeix secrets. Configuració
   administrativa, migració, runtime i client separades i ignorades per Git.
-- Renovació del token (`npm run token:rotate`) conservant l'owner; provada amb
-  fitxers sintètics. No s'ha executat sobre els secrets reals ni al Worker publicat.
+- Renovació del token (`npm run token:rotate`) conservant l’owner; provada amb
+  fitxers sintètics i executada sobre el Worker publicat segons D022.
 
 Contractes a [API](API_CONTRACT.md) i [MCP](MCP_CONTRACT.md), flux a
 [ARCHITECTURE](ARCHITECTURE.md), execució a [DEVELOPMENT](DEVELOPMENT.md).
@@ -136,8 +162,8 @@ Publicació autoritzada i executada segons D021. Següent pas: mesurar
 el consum de CPU i connectar Claude Code. HTTPS i `npm run dev:verify-remote` ja passen.
 No habilitar autodeploy. Les dades personals continuen prohibides.
 Guia i ordres a [DEVELOPMENT](DEVELOPMENT.md). La reconciliació documental i el
-[flux Git](GIT_WORKFLOW.md) estan aprovats; rotació real i implementació de
-`list_projects` requereixen aprovació separada. Sense llistat, un xat nou encara
+[flux Git](GIT_WORKFLOW.md) estan aprovats; rotació real autoritzada i executada a D022; implementació de
+`list_projects` encara requereix aprovació separada. Sense llistat, un xat nou encara
 necessita conèixer l’UUID del projecte.
 
 ## Objectius futurs
@@ -145,3 +171,10 @@ necessita conèixer l’UUID del projecte.
 Memòria personal, tasques, decisions, universitat, entrenaments, integracions,
 web i proactivitat per Telegram continuen a la [visió](PRODUCT_VISION.md) i el
 [roadmap](roadmap.md). No estan implementats ni autoritzats en aquest increment.
+
+## Punt de represa
+
+L'usuari deixa la feina per un altre dia. Pendent: confirmar el connector Claude
+web/app amb la credencial renovada. S'ha explicat una possible autenticació OAuth
+amb renovació automàtica; només és una proposta a estudiar, sense disseny aprovat
+ni implementació. Cal validar compatibilitat i costos abans de proposar-ne el codi.
