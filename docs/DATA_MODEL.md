@@ -21,11 +21,46 @@ els NULL no es dedupliquen. La mateixa fila conserva projecte i idempotència.
 El replay no modifica contingut ni dates. No hi ha retenció, eliminació o edició
 implementades. Semàntica pública al [contracte API](API_CONTRACT.md).
 
+## Connexions OAuth: `oauth_grants` (D023, implementat, migració no aplicada a Neon)
+
+Definida a `migrations/002_oauth_grants.sql`. Un **grant** és una connexió autoritzada:
+cada cop que l'usuari aprova un client (per exemple, Claude web) amb GitHub es crea una
+fila, que acompanya aquella connexió des del codi d'un sol ús fins als tokens renovats.
+Flux complet a [ARCHITECTURE](ARCHITECTURE.md).
+
+| Camp | Tipus i regla |
+| --- | --- |
+| id | UUID, PK generada al servidor |
+| owner_id | UUID NOT NULL; sempre `DEV_OWNER_ID`, sense taula d'usuaris |
+| client_hash | char(64) NOT NULL, SHA-256 del `client_id` |
+| redirect_uri | varchar(300) NOT NULL, adreça de retorn registrada |
+| code_hash | char(64) NOT NULL UNIQUE, SHA-256 del codi d'autorització |
+| code_challenge | char(43) NOT NULL, repte PKCE S256 |
+| code_expires_at / code_used_at | timestamptz; caducitat (60 s) i ús únic del codi |
+| access_hash / access_expires_at | char(64) UNIQUE nullable; access token vigent (1 h) |
+| refresh_hash / refresh_expires_at | char(64) UNIQUE nullable; refresh token vigent (30 dies) |
+| previous_refresh_hash / refresh_rotated_at | char(64) UNIQUE nullable; token anterior a la rotació i quan es va fer |
+| superseded_refresh_hash | char(64) UNIQUE nullable; token substituït per un reintent, per detectar dos posseïdors |
+| revoked_at | timestamptz nullable; connexió revocada |
+| created_at | timestamptz NOT NULL, per defecte now() |
+
+Els hashes són SHA-256 hexadecimals validats amb `CHECK`. **Mai es desen codis ni tokens
+en clar**: Jarvis només necessita comparar el hash del que rep, i així una còpia filtrada
+de la BD no dona accés. No hi ha taula de clients (el `client_id` és un registre signat)
+ni d'usuaris.
+
+El rol runtime té `SELECT, INSERT, UPDATE` sobre la taula, mai `DELETE`; ho concedeix
+`npm run db:migrate` i ho comprova `npm run db:verify`. Per això les files no s'esborren:
+la neteja de files caducades queda pendent, no implementada. La taula **no entra** a la
+còpia lògica (`db:backup`/`db:restore` només cobreixen `projects` i apliquen 001); després
+d'una restauració cal tornar a executar `db:migrate` i tornar a connectar els clients.
+
 ## Metadades operatives de migració
 
 `jarvis_migrations`: version (PK), sha256 i applied_at. Només accessible al rol
-migrador, no al runtime; registra la revisió 001 atòmicament amb l'esquema quan
-s'utilitza `npm run db:migrate`. No és una funcionalitat d'usuari.
+migrador, no al runtime. `npm run db:migrate` aplica 001 i les migracions posteriors
+(ara 002) i registra cada revisió amb el seu checksum atòmicament amb l'esquema.
+No és una funcionalitat d'usuari.
 Còpia/restauració a [DEVELOPMENT](DEVELOPMENT.md), decisions D018–D019.
 
 ## Model conceptual futur (no implementat)

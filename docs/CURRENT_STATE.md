@@ -1,6 +1,6 @@
 # Estat actual
 
-Actualitzat: 2026-11-18. Document principal d'estat executable i evidència.
+Actualitzat: 2026-11-24. Document principal d'estat executable i evidència.
 Visió a [PRODUCT_VISION](PRODUCT_VISION.md), motius a [DECISIONS](DECISIONS.md).
 
 ## Aprovat
@@ -9,9 +9,54 @@ D011–D014: Workers JavaScript, Neon Free PostgreSQL, API i MCP al mateix Worke
 SQL explícit, autenticació temporal amb propietari derivat del token i idempotència
 opcional. Únic increment autoritzat: crear i recuperar projectes amb dades fictícies.
 Sense gestió completa d'usuaris, rols d'aplicació, OAuth, tasques, Telegram, Calendar o web.
+**D023 (2026-11-24):** autenticació OAuth 2.1 pròpia amb inici de sessió de GitHub,
+aprovada amb implementació completa, commit i push de la branca. Substitueix el
+«sense OAuth» de la línia anterior. Publicar-la continua sent una acció de l'usuari.
 D017 autoritza preparar recursos Free, migrar i provar recuperació amb dades
 fictícies. D021 autoritza publicar el Worker de desenvolupament i preparar la
 connexió amb Claude Code, ara disponible; només dades fictícies i pla Free.
+
+## OAuth amb GitHub (D023) — implementat, NO desplegat
+
+Branca `feat/oauth-github`. **El Worker públic encara executa el codi anterior**, de
+manera que el connector de Claude web/app continua sense funcionar fins que es publiqui.
+
+**Implementat:** servidor d'autorització dins del Worker (metadades, registre de clients
+sense estat, consentiment, anada i tornada de GitHub, tokens amb rotació), taula
+`oauth_grants` (migració 002), autenticació per access token OAuth a API i MCP, token fix
+opcional, `npm run oauth:setup`, migracions múltiples amb ledger. Cap dependència ni
+servei nou. Detall a [ARCHITECTURE](ARCHITECTURE.md) i [SECURITY_PRIVACY](SECURITY_PRIVACY.md).
+
+**Verificat el 2026-11-24** (Node 24.22.1; sense npm en aquesta sessió, s'ha executat
+l'ordre equivalent de cada script directament amb `node`):
+
+| Comprovació | Resultat real | Abast |
+| --- | --- | --- |
+| `npm test` (equivalent) | 39/39 (18 API/MCP, 14 OAuth, 7 operatives) | Flux complet amb el client OAuth oficial del SDK MCP i **GitHub simulat**; model d'amenaces de SECURITY_PRIVACY |
+| `npm run test:worker` (equivalent) | 1/1 | workerd local: metadades, registre, pantalla de consentiment i rebuig de token falsificat dins del runtime real |
+| `npm run check` (equivalent) | Correcte | Sintaxi i enllaços Markdown |
+| `npm run build` (equivalent) | Correcte, 1654,98 KiB / gzip 305,68 KiB | Dry-run, sense desplegar |
+| SQL de `oauth_grants` sobre Neon real | Escenari d'emmagatzematge correcte | Rol migrador i driver `pg`, dins d'una transacció amb ROLLBACK; la taula no existeix després |
+| Revisió de seguretat independent | Cap via d'accés sense el compte permès; 6 troballes corregides o documentades | Agent revisor separat, amb proves de concepte contra el simulador |
+
+**No verificat ni executat:**
+
+- Desplegament, migració 002 a Neon i secrets nous: pendents de l'usuari.
+- GitHub real, Claude web/app real i Claude Code real. En particular, cap navegador
+  real ha enviat encara el formulari de consentiment.
+- `npm run test:postgres` i `npm run test:ops`: no hi ha PostgreSQL local en aquesta
+  màquina. Les proves noves per a `oauth_grants` i migracions múltiples hi són però
+  **no s'han executat**; `scripts/database-ops.js` i `scripts/db.js` s'han modificat sense
+  aquesta prova d'integració.
+- El driver HTTP de Neon del Worker amb les consultes noves (només s'ha provat el SQL amb `pg`).
+- `npm audit`: sense npm disponible; no s'ha afegit ni actualitzat cap dependència.
+
+Troballes de la revisió, totes amb prova nova: la pàgina de consentiment feia que el
+navegador enviés `Origin: null` (hauria bloquejat el botó); un lladre podia conservar
+l'accés reutilitzant un refresh token dins la finestra de reintent; el port variable de
+Claude Code; un sol clic bastava per aprovar; codis de GitHub mal formats arribaven a
+GitHub; un intercanvi simultani del mateix codi no revocava. Riscos residuals a
+[SECURITY_PRIVACY](SECURITY_PRIVACY.md).
 
 ## Estat operatiu
 
@@ -51,8 +96,10 @@ connexió amb Claude Code, ara disponible; només dades fictícies i pla Free.
   iguals a la còpia coneguda. Prova només de lectura, sense crear cap projecte.
 - Desplegament de secrets: b20f63b1-453b-4630-add2-83b2037424d3;
   versió activa al 100% indicada a l'estat operatiu. Cap canvi de codi del Worker.
-- Claude web/app encara pendent d'actualitzar Authorization i confirmar connexió.
-  La captura anterior és d'abans de la renovació; no acredita una prova posterior.
+- Claude web/app: la via de la capçalera `Authorization` queda abandonada; la connexió
+  es farà amb OAuth quan D023 estigui publicada. Cap connexió real confirmada encara.
+- Token fix vigent fins al 2026-11-25T17:57:36.599Z; després només servirà OAuth,
+  llevat que es torni a rotar per als scripts de verificació.
 
 ## Implementat
 
@@ -149,7 +196,8 @@ Els timings que Wrangler imprimeix són durada de petició, **no CPU del proveï
 - La còpia només cobreix projects i migració coneguda: no és pg_dump complet,
   recuperació del compte ni política de còpies per dades personals. No hi ha
   xifrat propi, retenció automatitzada ni còpia fora del dispositiu provats.
-- No hi ha OAuth, login web, rate limiter distribuït o garanties de disponibilitat.
+- OAuth implementat però no publicat (vegeu a dalt). No hi ha login web propi,
+  rate limiter distribuït o garanties de disponibilitat.
   Quotes Free poden interrompre el servei; cap fallback facturable.
 
 ## Següent pas i aprovacions
@@ -158,8 +206,11 @@ La preparació Free, migració, persistència i restauració remotes de l'increm
 han quedat verificades. No cal repetir ops:provision, token, backup o restore:
 aquests scripts rebutgen sobreescriure fitxers o bases ja ocupats.
 
-Publicació autoritzada i executada segons D021. Següent pas: mesurar
-el consum de CPU i connectar Claude Code. HTTPS i `npm run dev:verify-remote` ja passen.
+**Següent pas: posar en marxa D023** seguint els nou passos de
+[DEVELOPMENT](DEVELOPMENT.md#autenticació-oauth-amb-github--d023) (OAuth App a GitHub,
+`oauth:setup`, `db:migrate`, secrets, deploy, connectar Claude web i Claude Code) i
+registrar aquí cada resultat real. Després: mesurar el consum de CPU.
+Publicació inicial autoritzada i executada segons D021. HTTPS i `npm run dev:verify-remote` ja passen.
 No habilitar autodeploy. Les dades personals continuen prohibides.
 Guia i ordres a [DEVELOPMENT](DEVELOPMENT.md). La reconciliació documental i el
 [flux Git](GIT_WORKFLOW.md) estan aprovats; rotació real autoritzada i executada a D022; implementació de
@@ -174,7 +225,6 @@ web i proactivitat per Telegram continuen a la [visió](PRODUCT_VISION.md) i el
 
 ## Punt de represa
 
-L'usuari deixa la feina per un altre dia. Pendent: confirmar el connector Claude
-web/app amb la credencial renovada. S'ha explicat una possible autenticació OAuth
-amb renovació automàtica; només és una proposta a estudiar, sense disseny aprovat
-ni implementació. Cal validar compatibilitat i costos abans de proposar-ne el codi.
+D023 implementada, revisada i pujada a la branca `feat/oauth-github` el 2026-11-24;
+sense fusionar a main. Pendent de l'usuari: els nou passos de posada en marxa i la
+validació amb clients reals. Fins llavors el Worker públic no canvia.

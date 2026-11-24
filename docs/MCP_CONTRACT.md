@@ -6,10 +6,10 @@ API i MCP comparteixen servei, persistència i propietari autenticat.
 Estat executable a [CURRENT_STATE](CURRENT_STATE.md).
 
 D021: endpoint de desenvolupament publicat a
-`https://jarvis.jarvis-joancardonall.workers.dev/mcp`. Configuració Claude Code
-preparada a `.mcp.json`, amb token per variable d'entorn. Connexió remota i client
-real: transport remot verificat amb SDK oficial; client Claude Code pendent.
-Passos i limitacions a [DEVELOPMENT](DEVELOPMENT.md).
+`https://jarvis.jarvis-joancardonall.workers.dev/mcp`. Transport remot verificat amb
+el SDK oficial i el token fix; aquest Worker públic **encara no executa** el codi OAuth
+de D023. `.mcp.json` ja no porta capçalera `Authorization`: Claude Code farà OAuth pel
+navegador. Passos i limitacions a [DEVELOPMENT](DEVELOPMENT.md).
 
 ## Úniques eines de l'increment
 
@@ -29,10 +29,24 @@ protocol i schema es gestionen pel SDK. No s'ofereixen SQL lliure ni eines genè
 
 Proves automatitzades amb `Client` i `StreamableHTTPClientTransport` oficials,
 sense model d'IA. També es pot utilitzar MCP Inspector; procediment a
-[DEVELOPMENT](DEVELOPMENT.md). Credencial temporal pròpia, mai tokens de BD.
-Aquesta autenticació no implementa el flux OAuth MCP; clients que l'exigeixin
-queden fora de la compatibilitat garantida. Codex/Claude reals encara requereixen
-validació separada.
+[DEVELOPMENT](DEVELOPMENT.md). Credencials pròpies de Jarvis, mai tokens de BD.
+
+## Autenticació del client MCP (D023, implementat, no desplegat)
+
+Segueix l'especificació d'autorització MCP (2025-11-25) amb OAuth 2.1:
+
+1. **Descobriment**: `/mcp` sense token respon 401 amb `WWW-Authenticate` i
+   `resource_metadata`; el client llegeix les metadades `/.well-known/…`.
+2. **Registre**: el client es registra a `/oauth/register` (DCR) i rep un `client_id`.
+3. **Login pel navegador**: consentiment a Jarvis, inici de sessió amb GitHub i codi
+   que el client canvia per tokens amb PKCE; després crida `/mcp` amb Bearer i renova
+   amb el refresh token.
+
+Endpoints i errors al [contracte API](API_CONTRACT.md); flux pas a pas a
+[ARCHITECTURE](ARCHITECTURE.md). El token fix de desenvolupament continua sent una via
+opcional per a scripts. Flux complet provat localment amb el client OAuth oficial del
+SDK MCP i GitHub simulat; **pendent** de validar amb GitHub, Claude web/app i Claude Code
+reals. Codex encara requereix validació separada.
 
 ## Regles del client conversacional (futures)
 

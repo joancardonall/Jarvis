@@ -100,6 +100,8 @@ owner UUID derivat de configuració segura. Totes les consultes filtren propieta
 OAuth prematur. Sense infraestructura de gestió d'usuaris/rols.
 **Conseqüències:** rotació manual; no és OAuth MCP interoperable ni login web.
 Només dades fictícies; secrets propis, mai credencials de les eines del xat.
+**Actualització 2026-11-24:** D023 afegeix OAuth; aquest token passa a ser opcional,
+només per a scripts de verificació.
 
 ## D014 — Idempotència opcional — 2026-11-09
 
@@ -115,7 +117,7 @@ automàticament sense clau. Restricció SQL i operació atòmica per concurrènc
 
 - P001: React PWA (futur).
 - P004: Cron i accés propi a Calendar (futur).
-- P005: OAuth per a clients finals i PWA (ajornat).
+- P005: OAuth per a la futura PWA (ajornat). L'OAuth per a clients MCP ja està decidit a D023.
 
 ## Format per a decisions futures
 
@@ -222,3 +224,45 @@ regenerar owner (perdria accés als projectes) o afegir OAuth fora d'abast.
 del token antic i nova caducitat de set dies. Login Cloudflare propi si cal;
 cap valor de token al xat, logs o Git. La connexió de Claude es verifica separadament
 de la prova del servidor amb el SDK. Sense canvis de producte, merge o push.
+
+
+## D023 — OAuth 2.1 propi amb inici de sessió de GitHub — 2026-11-24
+
+**Estat:** aprovada expressament per l'usuari el 2026-11-24, amb implementació completa,
+adaptació de directrius i commit/push de la branca. **Implementada i provada localment;
+no desplegada ni validada amb GitHub o Claude reals.** Evidència a
+[CURRENT_STATE](CURRENT_STATE.md).
+**Context:** el connector de Claude web/app no funciona amb el token fix de D013: en
+rebre un 401 busca OAuth (protocol estàndard per delegar accés sense compartir
+contrasenyes), que Jarvis no oferia. A més, el token caducava cada 7 dies i calia
+enganxar-lo a mà.
+**Decisió:** el Worker fa també de servidor d'autorització OAuth 2.1. La identitat es
+delega a GitHub i només s'accepta un compte, identificat pel seu ID numèric
+(`209090554`, usuari `joancardonall`). Pantalla de consentiment pròpia, PKCE S256
+obligatori, registre dinàmic de clients sense estat, access tokens d'1 hora i refresh
+tokens de 30 dies amb rotació. Estat a Neon (taula `oauth_grants`, migració 002), només
+com a hashes SHA-256. El propietari de les dades continua sent el mateix UUID.
+Flux a [ARCHITECTURE](ARCHITECTURE.md), contracte a [API_CONTRACT](API_CONTRACT.md),
+amenaces a [SECURITY_PRIVACY](SECURITY_PRIVACY.md).
+**Justificació:** és el mecanisme que Claude espera; elimina la rotació manual; cap
+contrasenya desada a Jarvis; cap servei ni dependència nova; tot el codi és llegible
+i provable amb el simulador i amb el client OAuth oficial del SDK MCP.
+**Alternatives descartades:**
+- Llibreria `@cloudflare/workers-oauth-provider`: mantinguda per Cloudflare, però
+  exigeix un servei nou (KV), no es pot provar amb les proves Node actuals i el seu
+  registre de clients escriu a l'emmagatzematge sense autenticació.
+- Contrasenya pròpia: tota la seguretat dependria d'un secret endevinable i d'un
+  limitador d'intents que no tenim.
+- Tokens sense estat (signats, sense BD): no permeten codis d'un sol ús, rotació ni
+  revocació individual.
+- Identificar el compte pel nom d'usuari: es pot reanomenar i algú altre el pot reutilitzar.
+- Client ID Metadata Documents (CIMD): obligaria el Worker a descarregar URLs externes
+  (risc SSRF, peticions a destins triats per un tercer); Claude ja funciona amb registre dinàmic.
+- Cloudflare Access o un proveïdor d'identitat extern: servei addicional i menys control.
+**Conseqüències:** més superfície pública (set rutes noves sense token) i codi de
+seguretat propi que cal mantenir i revisar; tres secrets nous i una OAuth App a GitHub;
+sense limitador de peticions, endpoint de revocació, CORS ni scopes granulars (limitacions
+a SECURITY_PRIVACY). Canviar `OAUTH_SIGNING_KEY` revoca totes les connexions. El token fix
+queda com a via opcional. Substitueix la restricció «sense OAuth» de D013 i D022.
+Publicar continua sent una acció explícita de l'usuari (login de Wrangler i secrets).
+**Evidència de validació:** proves i límits a [CURRENT_STATE](CURRENT_STATE.md).

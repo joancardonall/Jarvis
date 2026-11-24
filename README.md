@@ -8,8 +8,9 @@ es consulta exclusivament a [CURRENT_STATE](docs/CURRENT_STATE.md).
 ## Primer increment
 
 Cloudflare Worker JavaScript amb API HTTP i MCP Streamable HTTP per crear i
-recuperar projectes, SQL explícit sobre Neon PostgreSQL i autenticació temporal.
-Idempotència opcional i aïllament per propietari. Només dades fictícies.
+recuperar projectes, SQL explícit sobre Neon PostgreSQL i autenticació OAuth 2.1
+amb inici de sessió de GitHub (D023), pensada per connectar Claude. Idempotència
+opcional i aïllament per propietari. Només dades fictícies.
 
 Amb Node >=22.19.0 i npm:
 
@@ -24,7 +25,9 @@ npm run build
 Les proves PostgreSQL dedicades i la configuració d'execució estan a la
 [guia de desenvolupament](docs/DEVELOPMENT.md). Neon Frankfurt/Free, permisos, persistència i restauració de desenvolupament
 estan verificats, inclòs Worker local→Neon. Worker publicat segons D021; HTTPS i circuit API/MCP→Neon remots verificats.
-Validació conversacional amb Codex o Claude Code pendent. `npm run dev`
+L'OAuth amb GitHub està implementat i provat localment, però **no desplegat**: el
+Worker publicat encara usa el token fix. Validació amb GitHub, Claude i Codex reals
+pendent. `npm run dev`
 arrenca en loopback; sense secrets, només salut és operativa.
 
 ## Documents principals

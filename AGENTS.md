@@ -42,6 +42,9 @@ afectada. Consulta també `README.md` i `docs/roadmap.md` per executar i planifi
 - Treballa per increments petits, comprovables i reversibles.
 - No canviïs stack, hosting, DB o arquitectura sense proposta explícita i aprovació de l'usuari.
 - La visió de `docs/PRODUCT_VISION.md` substitueix el pla anterior de chatbot/Ollama. El prototip s'ha retirat; l'arquitectura mínima està aprovada a D011–D014.
+- L'autenticació és OAuth 2.1 propi amb inici de sessió de GitHub (D023). Qualsevol canvi
+  en aquest codi es revisa contra el model d'amenaces de `docs/SECURITY_PRIVACY.md` i
+  manté les seves proves; no s'hi afegeixen dreceres ni vies d'accés alternatives.
 - No afegeixis frameworks, serveis de pagament, agents o embeddings sense justificació.
 - Separa domini, adaptadors HTTP/MCP, persistència i integracions; evita abstraccions prematures.
 - No suposis que l'accés a Codex inclou crèdits API ni execució autònoma del backend.
@@ -125,5 +128,14 @@ presentar la documentació com a prova d'una funcionalitat.
 10. No canviïs decisions aprovades ni l'abast del producte sense consultar l'usuari.
 
 La visió completa inclou memòria personal, projectes, tasques, universitat,
-entrenaments, integracions i seguiment proactiu per Telegram. Només crear i
-recuperar projectes està autoritzat per a l'increment actual; vegeu CURRENT_STATE.
+entrenaments, integracions i seguiment proactiu per Telegram.
+
+## Increment actual i següent tasca
+
+Autoritzat i implementat: crear i recuperar projectes (D011–D014) i autenticació OAuth
+amb GitHub (D023). **Següent tasca:** posar en marxa D023 (migració, secrets, publicació)
+i validar-la amb Claude web/app i Claude Code reals, seguint la guia de
+`docs/DEVELOPMENT.md`. Publicar, pujar secrets i migrar la BD real els executa o els
+confirma l'usuari. Després es continua amb el desenvolupament segons `docs/roadmap.md`
+(`list_projects`, tasques, resum per Telegram); cada funcionalitat nova necessita
+l'aprovació del seu abast. L'estat real es consulta sempre a `docs/CURRENT_STATE.md`.

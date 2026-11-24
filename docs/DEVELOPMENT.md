@@ -3,6 +3,125 @@
 Aquest document és la guia d'execució. Estat i evidència a
 [CURRENT_STATE](CURRENT_STATE.md); estructura a [ARCHITECTURE](ARCHITECTURE.md).
 
+## Autenticació OAuth amb GitHub — D023
+
+**Estat (2026-11-24): implementat i provat localment a la branca `feat/oauth-github`.
+NO desplegat i NO validat amb GitHub, Claude web/app ni Claude Code reals.** El Worker
+públic continua amb el codi anterior (només token fix). Els passos següents estan
+**PENDENTS**: no s'ha executat cap. Evidència i proves a [CURRENT_STATE](CURRENT_STATE.md);
+decisió a [DECISIONS](DECISIONS.md); amenaces i proteccions a [SECURITY_PRIVACY](SECURITY_PRIVACY.md).
+
+Què és: **OAuth** és un protocol estàndard perquè una aplicació (Claude) obtingui
+permís per usar un servei (Jarvis) sense conèixer cap contrasenya. Claude obre el
+navegador, inicies sessió amb GitHub i Jarvis entrega a Claude un token temporal.
+Només el compte de GitHub amb ID numèric `209090554` (configurat a `wrangler.jsonc`)
+pot entrar. Jarvis no guarda contrasenyes ni el token de GitHub.
+
+### Passos de posada en marxa (pendents)
+
+Ordre important: **migració i secrets abans del deploy**. Ordres al terminal, a l'arrel
+del projecte. Cap pas imprimeix secrets; no els enviïs mai pel xat.
+
+1. **Crear l'OAuth App a GitHub** (navegador). GitHub → Settings → Developer settings →
+   OAuth Apps → New OAuth App. Nom `Jarvis`; Homepage URL
+   `https://jarvis.jarvis-joancardonall.workers.dev`; Authorization callback URL
+   `https://jarvis.jarvis-joancardonall.workers.dev/oauth/callback`; Device Flow desactivat.
+   Després, «Generate a new client secret».
+   *Resultat:* tens un Client ID i un Client secret. El secret només es mostra un cop.
+   *Si falla:* si més endavant GitHub diu «redirect_uri mismatch», la callback URL
+   d'aquí no coincideix lletra per lletra amb la de dalt (barra final, `http` vs `https`).
+2. **Preparar el fitxer privat de secrets** (terminal):
+
+   ```sh
+   npm run oauth:setup
+   ```
+
+   Crea `.env.oauth.json` (permisos 0600, ignorat per Git) amb una `OAUTH_SIGNING_KEY`
+   aleatòria ja generada i dos camps buits. Obre'l amb l'editor i enganxa-hi Client ID i
+   Client secret. No el mostris amb `cat`.
+   *Resultat:* missatge `Created private .env.oauth.json ... No secret printed.`
+   *Si falla:* si el fitxer ja existeix, l'ordre s'atura i no el sobreescriu. Revisa'l
+   abans de decidir; no l'esborris a cegues.
+3. **Migrar la BD** (terminal):
+
+   ```sh
+   npm run db:migrate
+   npm run db:verify
+   ```
+
+   `db:migrate` aplica la migració 002 (taula `oauth_grants`) i dona al rol runtime
+   `SELECT, INSERT, UPDATE` sobre ella (mai DELETE). `db:verify` comprova els permisos.
+   *Resultat:* totes dues acaben sense error.
+   *Si falla:* si un checksum no coincideix, s'atura sense canviar res; no ho forcis.
+4. **Iniciar sessió a Cloudflare** (terminal):
+
+   ```sh
+   npx wrangler login
+   npx wrangler whoami
+   ```
+
+   *Resultat:* `whoami` mostra el compte propietari del Worker `jarvis`.
+5. **Pujar els tres secrets nous** (terminal):
+
+   ```sh
+   npx wrangler secret bulk .env.oauth.json --name jarvis --env-file /dev/null
+   ```
+
+   Afegeix `OAUTH_SIGNING_KEY`, `GITHUB_CLIENT_ID` i `GITHUB_CLIENT_SECRET` i conserva
+   els altres secrets. A Windows, posa un fitxer buit local en lloc de `/dev/null`.
+   *Resultat:* Wrangler confirma tres secrets pujats.
+6. **Desplegar el codi** (terminal):
+
+   ```sh
+   npx wrangler deploy --env-file /dev/null --message 'D023 OAuth with GitHub'
+   ```
+
+   *Resultat:* Wrangler mostra l'URL i un ID de versió nou.
+7. **Comprovar el servidor** (terminal):
+
+   ```sh
+   curl https://jarvis.jarvis-joancardonall.workers.dev/.well-known/oauth-authorization-server
+   npm run dev:verify-remote
+   ```
+
+   La primera ha de retornar JSON amb `issuer`. La segona prova API/MCP amb el token
+   fix, només mentre sigui vigent (caduca el 2026-11-25T17:57:36.599Z).
+   *Si falla:* 503 `oauth_not_configured` vol dir que falta un dels tres secrets o
+   que té format incorrecte (p. ex. clau de signatura massa curta o camp buit).
+8. **Connectar Claude web/app** (navegador). Customize → Connectors → eliminar el
+   connector Jarvis antic → Add custom connector amb
+   `https://jarvis.jarvis-joancardonall.workers.dev/mcp`, **sense capçaleres ni client id**
+   → Connect → pantalla de Jarvis → marcar la casella de confirmació → «Continuar amb GitHub».
+   *Resultat:* tornes a Claude i apareixen les dues eines.
+   *Si falla:* «Aquest compte de GitHub no té accés a Jarvis» vol dir que el navegador
+   té sessió amb un altre compte de GitHub; tanca'l a github.com i torna-ho a provar.
+   Un 503 genèric durant el login sol indicar que la migració del pas 3 no s'ha aplicat
+   (la taula `oauth_grants` no existeix).
+9. **Connectar Claude Code** (terminal, a l'arrel del projecte). Reinicia Claude Code,
+   escriu `/mcp`, tria `jarvis` i autentica: s'obrirà el navegador amb el mateix flux.
+   *Resultat:* `jarvis` apareix connectat amb les dues eines.
+
+Registra cada resultat real a [CURRENT_STATE](CURRENT_STATE.md); aquesta guia no és evidència.
+
+### Desfer i revocació d'emergència
+
+**Desfer el desplegament:** `npx wrangler rollback` (terminal) torna a la versió anterior.
+La taula `oauth_grants` pot quedar-se: no molesta el codi antic.
+
+**Revocar tot l'accés** (sospita de fuita): genera una `OAUTH_SIGNING_KEY` nova en un
+JSON privat que només contingui aquesta clau i puja'l amb `npx wrangler secret bulk
+FITXER_PRIVAT --name jarvis --env-file /dev/null` (`FITXER_PRIVAT` és un marcador).
+Tots els tokens, codis i clients registrats deixen de ser vàlids a l'instant: cal tornar
+a connectar Claude web i Claude Code. Per revocar una sola connexió no hi ha pantalla:
+cal un `UPDATE oauth_grants SET revoked_at = now() ...` amb el rol migrador.
+
+### Provar el login en local (opcional)
+
+Cal una **segona** OAuth App de GitHub amb callback `http://127.0.0.1:8787/oauth/callback`
+i les tres variables a `.dev.vars` (format a `.dev.vars.example`). Després `npm run dev`.
+La galeta `Secure` sobre `http://127.0.0.1` depèn del navegador: si falla aquí, no
+demostra que falli en remot. No reutilitzis l'OAuth App de producció.
+
 ## Publicació de desenvolupament — D021, 2026-11-11
 
 La prohibició de publicar dels procediments històrics següents queda substituïda
@@ -44,54 +163,39 @@ ja que `curl -I` envia HEAD i aquesta ruta no admet HEAD públic.
 
 ### Claude Code
 
-Configuració de projecte a `.mcp.json`, sense secrets: transport HTTP i Bearer
-des de `JARVIS_BEARER_TOKEN`. Amb Claude Code instal·lat i Node al PATH, iniciar-lo
-des de l'arrel amb el token carregat des del fitxer privat, sense imprimir-lo.
+Amb D023, `.mcp.json` només declara transport HTTP i l'URL `/mcp`: **ja no porta
+capçalera `Authorization`** ni llegeix `JARVIS_BEARER_TOKEN`. Claude Code rep un 401,
+descobreix l'OAuth de Jarvis i obre el navegador per iniciar sessió amb GitHub.
+Els passos són el 9 de la [posada en marxa](#passos-de-posada-en-marxa-pendents);
+no funcionaran fins que el Worker amb D023 estigui desplegat.
 
-macOS/Linux:
-
-```sh
-set -a
-. ./.env.client
-set +a
-claude
-```
-
-Windows PowerShell, amb el format generat pel projecte:
-
-```powershell
-$tokenLine = Get-Content .env.client | Where-Object { $_ -match '^JARVIS_BEARER_TOKEN=' }
-$env:JARVIS_BEARER_TOKEN = ($tokenLine -split '=', 2)[1].Trim('"')
-claude
-```
-
-Acceptar la configuració de projecte a Claude Code i consultar `/mcp`. No usar
-`claude -p` ni executar un model automàticament per aquesta comprovació.
-Amb TLS ja verificat, demanar crear un projecte fictici amb clau estable i
-recuperar-lo pel seu UUID en una conversa nova. Sense resposta d'èxit de l'eina,
-no considerar-lo desat. No donar permisos generals d'escriptura automàtica.
-No s'ha localitzat `claude` al PATH d'aquesta sessió; el client real queda pendent.
+Les instruccions anteriors (carregar `.env.client` a l'entorn abans d'iniciar
+`claude`) queden **obsoletes**. No usar `claude -p` ni executar un model
+automàticament per comprovar-ho. Amb l'eina connectada, crear un projecte fictici
+amb clau estable i recuperar-lo pel seu UUID en una conversa nova. Sense resposta
+d'èxit de l'eina, no considerar-lo desat. No donar permisos generals d'escriptura
+automàtica. Client real encara no validat.
 
 ### Claude web/app (connector remot)
 
-El connector configurat a Claude web/app és independent de `.mcp.json`, que és per
-Claude Code. L'URL és `https://jarvis.jarvis-joancardonall.workers.dev/mcp`.
+El connector de Claude web/app és independent de `.mcp.json`. L'URL és
+`https://jarvis.jarvis-joancardonall.workers.dev/mcp` i s'autentica amb OAuth:
+**sense capçaleres, sense client id i sense token a l'URL**. Passos: el 8 de la
+[posada en marxa](#passos-de-posada-en-marxa-pendents).
 
-A Customize/Configuració → Connectors → Add custom connector:
+Les instruccions anteriors (opció «No sign in» i capçalera `Authorization: Bearer`)
+queden **obsoletes**: Claude web, davant d'un 401, busca OAuth i el connector amb
+token fix no funcionava. La confirmació del client real es registra a CURRENT_STATE.
+[Guia oficial de connectors](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp)
+i [autenticació de connectors](https://claude.com/docs/connectors/building/authentication.md).
 
-1. Nom Jarvis i URL anterior, inclòs `/mcp`.
-2. Autenticació sense login OAuth («No sign in» si apareix aquesta opció).
-   Això no elimina l'autenticació de Jarvis: la credencial viatja a la capçalera.
-3. A Request headers, afegir nom `Authorization` i valor `Bearer ` seguit del token
-   vigent del fitxer privat `.env.client`, sense cometes. No enviar-lo pel xat.
-4. Desar i comprovar que es descobreixen les dues eines. La confirmació del client
-   real es registra a CURRENT_STATE, no s'infereix de la documentació del proveïdor.
+### Renovar el token fix (opcional)
 
-La documentació de Claude permet credencials fixes per capçalera; si aquests camps
-no apareixen al compte, no improvisar OAuth ni posar el token a l'URL.
-[Guia oficial de connectors](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp).
-
-### Renovar el token
+Amb D023 el token fix és **opcional**: només serveix per a scripts com
+`npm run dev:verify-remote`. Claude Code i Claude web/app ja no el necessiten.
+Un cop OAuth estigui verificat amb els clients reals, es pot deixar caducar sense
+renovar-lo: caducat o sense configurar, queda desactivat. `DEV_OWNER_ID` sí que
+cal conservar-lo, perquè identifica el propietari de les dades també amb OAuth.
 
 El token caduca als 7 dies. `npm run token:rotate` en genera un de nou i
 substitueix només `DEV_TOKEN_SHA256` i `DEV_TOKEN_EXPIRES_AT` a `.dev.vars` i
@@ -119,8 +223,7 @@ si falla la segona, pot quedar una parella inconsistent. Recuperar els dos fitxe
 coherents de la còpia abans de continuar. No reexecutar a cegues.
 
 La segona ordre actualitza els secrets del Worker publicat; fins llavors el
-remot només accepta el token antic. Després, recarregar `.env.client` i
-reiniciar Claude Code (vegeu l'apartat anterior). `npm run token` continua
+remot només accepta el token antic. `npm run token` continua
 reservat a la configuració inicial i mai sobreescriu fitxers.
 Validar el token nou recuperant projectes existents i comprovant que el vell
 retorna 401. Si el desplegament falla o la resposta es perd, no assumir quin
@@ -146,10 +249,15 @@ npm run build
 ```
 
 `npm test`: contracte HTTP/MCP amb storage simulat i serialització del driver Neon
-amb HTTP simulat. No requereix BD, LLM ni credencials reals.
+amb HTTP simulat. Inclou `tests/oauth.test.js`: flux OAuth complet amb el client
+oficial del SDK MCP i GitHub **simulat** (PKCE, redireccions, consentiment, rotació
+de tokens, falsificacions). No requereix BD, LLM, GitHub ni credencials reals.
 `test:worker`: Wrangler/workerd local, ports 18787 i l'inspector de Wrangler;
-comprova salut, autenticació i descoberta MCP per xarxa loopback, sense Neon.
+comprova salut, autenticació, descoberta MCP, metadades OAuth, registre i pantalla
+de consentiment per xarxa loopback, sense Neon ni GitHub.
 `build`: només empaquetament `wrangler deploy --dry-run`, no desplega.
+`oauth:setup`: crea `.env.oauth.json` privat per al pas 2 de la
+[posada en marxa](#passos-de-posada-en-marxa-pendents); no sobreescriu mai.
 
 `npm run dev` escolta només a 127.0.0.1:8787. Sense configuració, `/health`
 funciona i les rutes privades fallen tancades. No hi ha fallback en memòria.
@@ -185,6 +293,13 @@ La prova verifica API→MCP, MCP→API en instància nova, aïllament, 10 escrip
 concurrents amb la mateixa clau, conflictes sense alterar contingut, absència de
 clau, restriccions SQL i rollback sense reserva de clau persistent. Empra el mateix
 SQL que producció amb un adaptador pg transaccional; no prova el servei Neon real.
+
+Una segona prova aplica la migració 002 i executa sobre `oauth_grants` l'escenari
+compartit `tests/grant-storage.js`: codis d'un sol ús, rotació de refresh tokens i
+restriccions. El mateix escenari corre a `npm test` contra el simulador en memòria,
+perquè simulador i SQL real no divergeixin. **Aquesta prova encara no s'ha executat**
+(no hi havia PostgreSQL local); el SQL sí que s'ha provat sobre Neon amb ROLLBACK,
+vegeu [CURRENT_STATE](CURRENT_STATE.md).
 
 ## Preparació externa autoritzada — D017
 
@@ -275,11 +390,13 @@ npm run dev:verify-neon
   CREATEROLE, BYPASSRLS o membresies. Configura permisos separats per BD i schema.
   Desa primer les credencials a `.env.database`, amb mode Unix 0600, per conservar
   capacitat de recuperació si una operació remota falla parcialment.
-- `db:migrate`: aplica la SQL revisada 001 i registra checksum a `jarvis_migrations`
-  en una mateixa transacció. Repetir-la és segur només si el checksum coincideix.
-  Si hi ha esquema antic sense ledger, s'atura: no l'adopta automàticament.
+- `db:migrate`: aplica les SQL revisades 001 i 002 (`oauth_grants`, D023) i registra
+  cada checksum a `jarvis_migrations` en transacció. Repetir-la és segur només si els
+  checksums coincideixen. Concedeix al runtime `SELECT, INSERT, UPDATE` sobre
+  `oauth_grants`, mai DELETE. Si hi ha esquema antic sense ledger, s'atura.
 - `db:verify`: prova TLS, connexió i privilegis mínims. Runtime: SELECT, INSERT i
-  UPDATE(idempotency_key) a projects, sense DELETE, edició de name ni CREATE al schema.
+  UPDATE(idempotency_key) a projects, sense DELETE, edició de name ni CREATE al schema;
+  també els permisos sobre `oauth_grants`.
 - `token`: genera un token nou i el desa a `.env.client`; `.dev.vars` conté només
   hash, caducitat, owner i URL runtime. **Ja no imprimeix secrets.** Cap fitxer existent
   se sobreescriu; una rotació requereix decisió local explícita sobre els fitxers.
@@ -309,6 +426,8 @@ el snapshot resultant complet. Mai esborra el destí ni toca la BD d'origen.
 Fitxer preexistent o destí ocupat: falla tancat, no sobreescriu. No és pg_dump
 complet: exclou rols, configuració, altres taules i recuperació del compte.
 Checksum detecta corrupció, no autentica còpies externes desconegudes.
+La còpia no inclou `oauth_grants` i la restauració només aplica 001: després de
+restaurar cal executar `db:migrate` i tornar a connectar els clients OAuth.
 
 Aquesta és una prova acotada de restauració; no una política operativa per dades
 personals. La còpia és local i no té xifrat propi ni retenció automatitzada.
@@ -335,8 +454,8 @@ més recent que el Node de les proves locals inicials. No s'ha validat manualmen
 
 ## Proves de les operacions
 
-`npm test` inclou límits de destí, TLS, corrupció de còpies i fitxers privats sense
-overwrite. `npm run test:ops` requereix un **clúster local descartable nou**, amb
+`npm test` inclou límits de destí, TLS, corrupció de còpies, fitxers privats sense
+overwrite (també `.env.oauth.json`) i la detecció de la migració 002. `npm run test:ops` requereix un **clúster local descartable nou**, amb
 `jarvis_dev` i `jarvis_restore` buides, `OPS_TEST_ADMIN_URL` loopback i
 `OPS_TEST_ISOLATED_CLUSTER=true`. Crea rols amb noms fixos en aquest clúster;
 no donar-hi mai un servidor personal ni la configuració Neon de desenvolupament.

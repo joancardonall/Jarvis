@@ -177,3 +177,54 @@ real queda pendent de l'usuari; no es dona per completada per la prova del SDK.
 
 Sense secrets al xat, logs o Git; sense canvis de pla o permisos. No s'afegeix OAuth.
 Cap concepte es marca com a après: l'usuari havia indicat dubtes a la revisió anterior.
+
+## 2026-11-24 — OAuth 2.1 amb GitHub (D023)
+
+Què s'ha fet i per què: el connector de Claude web/app no funcionava amb el token
+fix, perquè davant d'un 401 Claude busca **OAuth** (un protocol estàndard per donar
+permís a una aplicació sense compartir contrasenyes). L'usuari ha autoritzat D023:
+Jarvis inicia sessió delegant la identitat a GitHub, dins del mateix Worker, sense
+dependències ni serveis nous i amb una taula nova a Neon (`oauth_grants`).
+Procediment a [DEVELOPMENT](../DEVELOPMENT.md), evidència a
+[CURRENT_STATE](../CURRENT_STATE.md), amenaces a [SECURITY_PRIVACY](../SECURITY_PRIVACY.md).
+
+Conceptes clau, amb un exemple de Jarvis:
+
+- **Servidor d'autorització vs servidor de recursos.** El primer emet tokens; el
+  segon protegeix les dades i els comprova. Jarvis fa tots dos papers: `/oauth/token`
+  dona un token a Claude i `/mcp` l'accepta per crear un projecte.
+- **PKCE** (Proof Key for Code Exchange). Claude inventa un secret, envia només el
+  seu hash al començar i el secret original al final. Si algú roba el codi
+  d'autorització pel camí, no pot canviar-lo per un token sense aquell secret.
+- **Pantalla de consentiment i «confused deputy».** Un atacant podria iniciar la
+  connexió amb el SEU Claude i enviar-te l'enllaç; GitHub, com que ja hi tens sessió,
+  no et preguntaria res i li donaries accés al teu Jarvis. Per això Jarvis mostra una
+  pantalla pròpia: «Continua només si acabes d'iniciar tu aquesta connexió».
+- **Rotació de refresh tokens.** L'access token dura 1 hora; el refresh token (30 dies)
+  serveix per demanar-ne un de nou. Cada renovació en lliura un altre i invalida
+  l'anterior: si un refresh token antic torna a aparèixer, algú l'ha copiat i Jarvis
+  revoca tota la connexió.
+- **Només hashes a la BD.** Es desa el SHA-256 de cada codi i token, no el valor. Si
+  algú llegís `oauth_grants`, no podria usar res: com no es guarden les contrasenyes
+  en clar en un login PHP.
+- **ID numèric de GitHub, no el nom d'usuari.** Un nom d'usuari es pot canviar i un
+  altre el pot reutilitzar; l'ID `209090554` és fix. Jarvis compara aquest número.
+- **Valors sense estat signats amb HMAC** (un codi d'autenticació criptogràfic amb una
+  clau secreta). El `client_id` i l'estat del flux porten tota la informació signada
+  amb `OAUTH_SIGNING_KEY`, així que no cal desar-los. Una petició anònima amb un token
+  inventat es rebutja abans de tocar Neon; i canviar la clau invalida tot de cop.
+
+Verificat realment: 39 proves de `npm test` (abans 23) i `test:worker` en workerd local;
+flux complet amb el client oficial del SDK MCP i GitHub **simulat**; `check` i `build`;
+el SQL de la migració 002 sobre Neon dins d'una transacció amb ROLLBACK (taula no creada).
+**No verificat:** desplegament, GitHub real, Claude web/app i Claude Code reals,
+`test:postgres` i `test:ops` (sense PostgreSQL local), ni el driver HTTP de Neon amb
+aquestes consultes. Migració 002 no aplicada a Neon. Limitacions conegudes: sense
+límit de peticions, sense pantalla de revocació i files caducades sense netejar.
+
+Preguntes de comprensió:
+1. Per què un codi d'autorització robat no serveix a l'atacant gràcies a PKCE?
+2. Què protegeix la pantalla de consentiment que GitHub sol no protegiria?
+3. Per què canviar `OAUTH_SIGNING_KEY` desconnecta tots els clients alhora?
+
+Cap concepte es marca com a après sense confirmació de l'usuari.
