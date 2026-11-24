@@ -16,10 +16,25 @@ D017 autoritza preparar recursos Free, migrar i provar recuperació amb dades
 fictícies. D021 autoritza publicar el Worker de desenvolupament i preparar la
 connexió amb Claude Code, ara disponible; només dades fictícies i pla Free.
 
-## OAuth amb GitHub (D023) — implementat, NO desplegat
+## OAuth amb GitHub (D023) — desplegat, pendent de clients reals
 
-Branca `feat/oauth-github`. **El Worker públic encara executa el codi anterior**, de
-manera que el connector de Claude web/app continua sense funcionar fins que es publiqui.
+**Posada en marxa 2026-11-24** (passos 1–7 de [DEVELOPMENT](DEVELOPMENT.md), executats
+per l'usuari; comprovacions fetes per l'agent):
+
+- OAuth App de GitHub creada; `.env.oauth.json` amb format vàlid, permisos 0600, ignorat per Git.
+- `npm run db:migrate` executat per l'usuari; `npm run db:verify`: **Runtime connection and
+  minimum permissions verified** (inclou ara `oauth_grants`).
+- Secrets pujats: `OAUTH_SIGNING_KEY`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` (llistats
+  per nom, sense valors). Versió activa **`abc5bd69-18ed-48a2-8c5b-8628393d25dd`** (100%),
+  missatge `D023 OAuth with GitHub`, publicada des de la branca `feat/oauth-github`.
+- Remot: salut 200; metadades RFC 8414 i RFC 9728 correctes; 401 amb `resource_metadata`;
+  registre de client 201; pantalla de consentiment 200 amb casella; token falsificat 401.
+- `npm run dev:verify-remote` amb el token fix: passa (API/MCP i persistència Neon).
+- **Pendent:** login real amb GitHub i connexió de Claude web/app i Claude Code.
+
+### Detall de la implementació (abans del desplegament)
+
+Branca `feat/oauth-github` (encara no fusionada a main).
 
 **Implementat:** servidor d'autorització dins del Worker (metadades, registre de clients
 sense estat, consentiment, anada i tornada de GitHub, tokens amb rotació), taula
@@ -41,7 +56,6 @@ l'ordre equivalent de cada script directament amb `node`):
 
 **No verificat ni executat:**
 
-- Desplegament, migració 002 a Neon i secrets nous: pendents de l'usuari.
 - GitHub real, Claude web/app real i Claude Code real. En particular, cap navegador
   real ha enviat encara el formulari de consentiment.
 - `npm run test:postgres` i `npm run test:ops`: no hi ha PostgreSQL local en aquesta
@@ -225,6 +239,6 @@ web i proactivitat per Telegram continuen a la [visió](PRODUCT_VISION.md) i el
 
 ## Punt de represa
 
-D023 implementada, revisada i pujada a la branca `feat/oauth-github` el 2026-11-24;
-sense fusionar a main. Pendent de l'usuari: els nou passos de posada en marxa i la
-validació amb clients reals. Fins llavors el Worker públic no canvia.
+D023 publicada el 2026-11-24 des de la branca `feat/oauth-github` (sense fusionar a main).
+Pendent: passos 8–9 (connectar Claude web/app i Claude Code amb login real de GitHub)
+i registrar-ne el resultat aquí.
