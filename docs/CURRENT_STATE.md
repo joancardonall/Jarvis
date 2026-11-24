@@ -220,10 +220,9 @@ La preparació Free, migració, persistència i restauració remotes de l'increm
 han quedat verificades. No cal repetir ops:provision, token, backup o restore:
 aquests scripts rebutgen sobreescriure fitxers o bases ja ocupats.
 
-**Següent pas: posar en marxa D023** seguint els nou passos de
-[DEVELOPMENT](DEVELOPMENT.md#autenticació-oauth-amb-github--d023) (OAuth App a GitHub,
-`oauth:setup`, `db:migrate`, secrets, deploy, connectar Claude web i Claude Code) i
-registrar aquí cada resultat real. Després: mesurar el consum de CPU.
+**Següent pas: acabar la posada en marxa de D023.** Passos 1–7 de
+[DEVELOPMENT](DEVELOPMENT.md#autenticació-oauth-amb-github--d023) fets; queden el 8 i el 9
+(connectar Claude web/app i Claude Code amb login real de GitHub) i registrar aquí el resultat. Després: mesurar el consum de CPU.
 Publicació inicial autoritzada i executada segons D021. HTTPS i `npm run dev:verify-remote` ja passen.
 No habilitar autodeploy. Les dades personals continuen prohibides.
 Guia i ordres a [DEVELOPMENT](DEVELOPMENT.md). La reconciliació documental i el
