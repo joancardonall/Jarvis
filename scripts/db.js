@@ -21,7 +21,8 @@ await runSafely(async () => {
     if (command === 'migrate') {
       await migrate(client);
       await client.query('GRANT SELECT, INSERT, UPDATE(idempotency_key) ON public.projects TO jarvis_runtime');
-      console.log('Migration 001 and runtime table grants verified.');
+      await client.query('GRANT SELECT, INSERT, UPDATE ON public.oauth_grants TO jarvis_runtime');
+      console.log('Migrations 001-002 and runtime table grants verified.');
     } else if (command === 'backup') {
       const snapshot = await snapshotProjects(client);
       await mkdir('backups', { recursive: true, mode: 0o700 });
@@ -45,10 +46,13 @@ await runSafely(async () => {
           has_column_privilege(current_user,'public.projects','idempotency_key','UPDATE') AS can_replay,
           NOT has_table_privilege(current_user,'public.projects','DELETE') AS no_delete,
           NOT has_column_privilege(current_user,'public.projects','name','UPDATE') AS no_edit,
+          has_table_privilege(current_user, 'public.oauth_grants','SELECT, INSERT, UPDATE') AS can_use_grants,
+          NOT has_table_privilege(current_user,'public.oauth_grants','DELETE') AS no_grant_delete,
           NOT has_schema_privilege(current_user,'public','CREATE') AS no_ddl
           FROM pg_roles WHERE rolname=current_user`)).rows[0];
         if (!privileges || !Object.values(privileges).every(Boolean)) throw new Error('privileges_too_broad');
         await runtime.query('SELECT id FROM public.projects LIMIT 1');
+        await runtime.query('SELECT id FROM public.oauth_grants LIMIT 1');
         console.log('Runtime connection and minimum permissions verified.');
       } finally { await runtime.end(); }
     }

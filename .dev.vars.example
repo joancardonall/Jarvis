@@ -6,3 +6,8 @@ DEV_OWNER_ID="REPLACE_WITH_GENERATED_UUID"
 DEV_TOKEN_EXPIRES_AT="REPLACE_WITH_GENERATED_EXPIRY"
 # Exact origin, no trailing slash. Empty forbids browser Origin headers.
 ALLOWED_ORIGIN=""
+# OAuth login with GitHub (D023). Local development only needs these to try the login flow;
+# create a separate GitHub OAuth App whose callback is http://127.0.0.1:8787/oauth/callback.
+OAUTH_SIGNING_KEY="REPLACE_WITH_43_OR_MORE_RANDOM_BASE64URL_CHARACTERS"
+GITHUB_CLIENT_ID="REPLACE_WITH_GITHUB_OAUTH_APP_CLIENT_ID"
+GITHUB_CLIENT_SECRET="REPLACE_WITH_GITHUB_OAUTH_APP_CLIENT_SECRET"

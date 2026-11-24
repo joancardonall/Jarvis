@@ -8,6 +8,19 @@ export async function migrationDefinition() {
   return { sql, hash: checksum(sql) };
 }
 
+// Schema changes not covered by the logical snapshot of projects (applied after version 001).
+const LATER_MIGRATIONS = [{ version: '002', file: '002_oauth_grants.sql' }];
+const withoutTransaction = sql => sql.replace(/^BEGIN;\s*/, '').replace(/COMMIT;\s*$/, '');
+
+export async function laterMigrations() {
+  return Promise.all(LATER_MIGRATIONS.map(async ({ version, file }) => {
+    const sql = await readFile(new URL(`../migrations/${file}`, import.meta.url), 'utf8');
+    return { version, sql, hash: checksum(sql) };
+  }));
+}
+
+// Applies every pending migration inside one transaction and records its checksum in a ledger.
+// Repeating the command is safe; a reviewed file that changed after being applied is refused.
 export async function migrate(client) {
   const definition = await migrationDefinition();
   await client.query('BEGIN');
@@ -19,9 +32,18 @@ export async function migrate(client) {
     } else {
       if (existing.rows[0].projects) throw new Error('untracked_existing_schema');
       // The reviewed SQL includes BEGIN/COMMIT for psql. One outer transaction also records its checksum.
-      await client.query(definition.sql.replace(/^BEGIN;\s*/, '').replace(/COMMIT;\s*$/, ''));
+      await client.query(withoutTransaction(definition.sql));
       await client.query('CREATE TABLE public.jarvis_migrations (version text PRIMARY KEY, sha256 text NOT NULL, applied_at timestamptz NOT NULL DEFAULT now())');
       await client.query('INSERT INTO public.jarvis_migrations(version, sha256) VALUES ($1, $2)', ['001', definition.hash]);
+    }
+    for (const migration of await laterMigrations()) {
+      const record = await client.query('SELECT sha256 FROM public.jarvis_migrations WHERE version = $1', [migration.version]);
+      if (record.rows[0]) {
+        if (record.rows[0].sha256 !== migration.hash) throw new Error('migration_mismatch');
+        continue;
+      }
+      await client.query(withoutTransaction(migration.sql));
+      await client.query('INSERT INTO public.jarvis_migrations(version, sha256) VALUES ($1, $2)', [migration.version, migration.hash]);
     }
     await client.query('COMMIT');
   } catch (error) { await client.query('ROLLBACK'); throw error; }

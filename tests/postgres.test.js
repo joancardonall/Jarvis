@@ -2,8 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { Pool } from 'pg';
-import { CREATE_PROJECT, GET_PROJECT, createValues } from '../src/repository.js';
-import { setup, ownerB } from './helpers.js';
+import { CREATE_PROJECT, GET_PROJECT, createValues, grantOperations } from '../src/repository.js';
+import { setup, ownerA, ownerB } from './helpers.js';
+import { exerciseGrantStorage } from './grant-storage.js';
 
 // Never infer a test target from DATABASE_URL. Require an explicitly dedicated loopback DB.
 const target = process.env.TEST_DATABASE_URL;
@@ -75,6 +76,33 @@ test('real PostgreSQL migration, API/MCP, concurrent idempotency, rollback and c
   } finally {
     await pool.end();
     // Only this test's randomly named schema; never public or an arbitrary schema.
+    await admin.query(`DROP SCHEMA ${schema} CASCADE`);
+    await admin.end();
+  }
+});
+
+test('real PostgreSQL: OAuth grant migration, single-use codes, rotation and constraints', async () => {
+  const admin = new Pool({ connectionString: target });
+  const schema = 'jarvis_test_' + crypto.randomUUID().replaceAll('-', '');
+  await admin.query(`CREATE SCHEMA ${schema}`);
+  const pool = new Pool({ connectionString: target, options: `-c search_path=${schema}`, max: 12 });
+  try {
+    await pool.query(await readFile(new URL('../migrations/002_oauth_grants.sql', import.meta.url), 'utf8'));
+    const storage = grantOperations(async (text, values) => (await pool.query(text, values)).rows);
+    await exerciseGrantStorage(storage, ownerA);
+    // Ten simultaneous exchanges of the same code: the database lets exactly one win.
+    const code = 'e'.repeat(64);
+    await storage.createGrant({ id: crypto.randomUUID(), owner_id: ownerA, client_hash: 'c'.repeat(64),
+      redirect_uri: 'http://localhost/callback', code_hash: code, code_challenge: 'k'.repeat(43),
+      code_expires_at: new Date(Date.now() + 60000) });
+    const results = await Promise.all(Array.from({ length: 10 }, (_, index) => storage.redeemCode(code, {
+      access_hash: index.toString(16).repeat(64), refresh_hash: (index + 6).toString(16).repeat(64),
+      access_expires_at: new Date(Date.now() + 3600000), refresh_expires_at: new Date(Date.now() + 86400000) }, new Date())));
+    assert.equal(results.filter(Boolean).length, 1);
+    await assert.rejects(pool.query("UPDATE oauth_grants SET access_hash = 'not-a-hash'"), { code: '23514' });
+    await assert.rejects(pool.query('UPDATE oauth_grants SET owner_id = NULL'), { code: '23502' });
+  } finally {
+    await pool.end();
     await admin.query(`DROP SCHEMA ${schema} CASCADE`);
     await admin.end();
   }

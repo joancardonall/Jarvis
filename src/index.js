@@ -3,13 +3,15 @@ import { AppError, publicError } from './errors.js';
 import { createProjectService } from './projects.js';
 import { neonRepository } from './repository.js';
 import { handleMcp } from './mcp.js';
+import { handleOAuth, isConsentSubmission, resourceMetadataUrl } from './oauth.js';
 
 const json = (body, status = 200) => Response.json(body, {
   status, headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' },
 });
 
-async function readJson(request) {
-  if (request.headers.get('Content-Type')?.split(';')[0].trim() !== 'application/json') {
+// Reads the body with a hard size limit and the expected media type.
+async function readBody(request, mediaType) {
+  if (request.headers.get('Content-Type')?.split(';')[0].trim().toLowerCase() !== mediaType) {
     throw new AppError(415, 'unsupported_media_type');
   }
   const reader = request.body?.getReader();
@@ -30,25 +32,41 @@ async function readJson(request) {
   const bytes = new Uint8Array(size);
   let offset = 0;
   for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
-  try { return JSON.parse(new TextDecoder().decode(bytes)); }
+  return new TextDecoder().decode(bytes);
+}
+
+async function readJson(request) {
+  const text = await readBody(request, 'application/json');
+  try { return JSON.parse(text); }
   catch { throw new AppError(400, 'invalid_json'); }
 }
 
-// Dependency injection is used only by tests; production always constructs Neon repositories.
-export function createApp(repositoryFactory = env => neonRepository(env.DATABASE_URL)) {
+const readForm = async request => new URLSearchParams(await readBody(request, 'application/x-www-form-urlencoded'));
+
+// Dependency injection is used only by tests; production always uses Neon, real time and real fetch.
+export function createApp(repositoryFactory = env => neonRepository(env.DATABASE_URL),
+  { fetchUpstream = (...args) => fetch(...args), clock = Date.now } = {}) {
   return {
     async fetch(request, env) {
+      const url = new URL(request.url);
       try {
-        const url = new URL(request.url);
         if (url.pathname === '/health' && request.method === 'GET') return json({ status: 'ok' });
         const origin = request.headers.get('Origin');
-        if (origin && origin !== env.ALLOWED_ORIGIN) throw new AppError(403, 'origin_forbidden');
+        // The consent form is the only browser request accepted, and only from this server's own page.
+        const ownForm = isConsentSubmission(request, url) && origin === url.origin;
+        if (origin && origin !== env.ALLOWED_ORIGIN && !ownForm) throw new AppError(403, 'origin_forbidden');
         // Plain HTTP is accepted only on loopback for local development.
         if (url.protocol !== 'https:' && !['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname)) {
           throw new AppError(400, 'https_required');
         }
-        const owner = await authenticate(request, env);
-        const service = createProjectService(repositoryFactory(env));
+        const now = clock();
+        // Created on first use: requests rejected earlier never open a database connection.
+        let cached;
+        const repository = () => cached ??= repositoryFactory(env);
+        const oauthResponse = await handleOAuth(request, url, env, { repository, fetchUpstream, now, readJson, readForm });
+        if (oauthResponse) return oauthResponse;
+        const owner = await authenticate(request, env, { repository, now });
+        const service = createProjectService(repository());
         if (url.pathname === '/mcp') {
           // Bound the body before handing parsed JSON back through the official transport.
           let incoming = request;
@@ -77,7 +95,9 @@ export function createApp(repositoryFactory = env => neonRepository(env.DATABASE
       } catch (error) {
         const safe = publicError(error);
         const response = json({ error: safe.code }, safe.status);
-        if (safe.status === 401) response.headers.set('WWW-Authenticate', 'Bearer realm="jarvis-development"');
+        // Tells OAuth clients such as Claude where to discover how to log in (RFC 9728).
+        if (safe.status === 401) response.headers.set('WWW-Authenticate',
+          `Bearer realm="jarvis", resource_metadata="${resourceMetadataUrl(url.origin)}"`);
         return response;
       }
     },

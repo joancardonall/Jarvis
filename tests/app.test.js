@@ -83,7 +83,10 @@ test('authentication fails closed for absent, bad, expired and unconfigured cred
   }
   api.env.DEV_TOKEN_EXPIRES_AT = '2000-01-01T00:00:00Z';
   assert.equal((await api.request('/mcp')).status, 401);
+  // Without a usable fixed token the request is simply unauthorized; OAuth remains the way in.
   delete api.env.DEV_TOKEN_SHA256;
+  assert.equal((await api.request('/mcp')).status, 401);
+  delete api.env.DEV_OWNER_ID;
   assert.equal((await api.request('/mcp')).status, 503);
 });
 

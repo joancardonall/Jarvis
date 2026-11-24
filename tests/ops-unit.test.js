@@ -95,3 +95,28 @@ test('token rotation keeps owner and settings, replaces token, and rejects the o
     assert.equal(await readFile(join(dir, '.env.client'), 'utf8'), clientBefore);
   } finally { await rm(dir, { recursive: true }); }
 });
+
+test('OAuth secrets template is private, has a strong signing key and is never overwritten', async () => {
+  const { writeOAuthSecretsTemplate } = await import('../scripts/oauth-setup.js');
+  const { isSigningSecret } = await import('../src/tokens.js');
+  const dir = await mkdtemp(join(tmpdir(), 'jarvis-oauth-setup-test-'));
+  try {
+    const file = join(dir, '.env.oauth.json');
+    await writeOAuthSecretsTemplate(file);
+    const first = JSON.parse(await readFile(file, 'utf8'));
+    assert.deepEqual(Object.keys(first), ['OAUTH_SIGNING_KEY', 'GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET']);
+    assert.equal(isSigningSecret(first.OAUTH_SIGNING_KEY), true);
+    assert.equal(first.GITHUB_CLIENT_SECRET, '');
+    await assert.rejects(writeOAuthSecretsTemplate(file), /output_already_exists/);
+    assert.equal(await readFile(file, 'utf8'), JSON.stringify(first, null, 2) + '\n');
+    if (process.platform !== 'win32') assert.equal((await stat(file)).mode & 0o777, 0o600);
+  } finally { await rm(dir, { recursive: true }); }
+});
+
+test('later migrations are tracked by checksum and keep the projects snapshot format stable', async () => {
+  const { laterMigrations } = await import('../scripts/database-ops.js');
+  const migrations = await laterMigrations();
+  assert.deepEqual(migrations.map(migration => migration.version), ['002']);
+  assert.match(migrations[0].sql, /CREATE TABLE oauth_grants/);
+  assert.match(migrations[0].hash, /^[a-f0-9]{64}$/);
+});

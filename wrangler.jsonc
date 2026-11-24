@@ -7,5 +7,8 @@
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
   "preview_urls": false,
-  "observability": { "enabled": false }
+  "observability": { "enabled": false },
+  // Public numeric id of the only GitHub account allowed to log in (not a secret).
+  // The username is deliberately not used: it can be renamed and reused by someone else.
+  "vars": { "GITHUB_ALLOWED_USER_ID": "209090554" }
 }
