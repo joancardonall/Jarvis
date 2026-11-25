@@ -242,11 +242,14 @@ test('university: courses, groups with teachers, deliverables and academic conte
     assert.equal((await call(client, 'list_courses', { status: 'archived' })).courses.length, 1);
 
     const missing = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+    const anyProject = await call(client, 'create_project', { name: 'Synthetic project for error codes' });
     for (const [name, args, code] of [
       ['create_task', { title: 'x', course_id: missing }, 'course_not_found'],
       ['save_note', { kind: 'note', content: 'x', course_id: missing }, 'course_not_found'],
       ['update_task', { task_id: lab.id, course_id: missing }, 'course_not_found'],
       ['update_task', { task_id: missing, course_id: course.id }, 'task_not_found'],
+      ['update_task', { task_id: missing, project_id: anyProject.id }, 'task_not_found'],
+      ['update_task', { task_id: lab.id, project_id: missing }, 'project_not_found'],
       ['save_course_group', { course_id: missing, kind: 'lab' }, 'course_not_found'],
       ['update_course', { course_id: missing, name: 'x' }, 'course_not_found'],
       ['get_course_overview', { course_id: missing }, 'course_not_found'],

@@ -11,15 +11,18 @@ el SDK oficial; des del 2026-11-24 el Worker públic executa l'OAuth de D023, ve
 amb Claude web/app el 2026-11-25. `.mcp.json` ja no porta capçalera `Authorization`: Claude Code farà OAuth pel
 navegador. Passos i limitacions a [DEVELOPMENT](DEVELOPMENT.md).
 
-## Eines (D024–D026: implementades, no desplegades)
+## Eines
 
-**Estat:** les 13 eines existeixen al codi i estan provades localment (client MCP oficial
-contra simulador, PostgreSQL local i workerd), però **no estan desplegades**: el Worker
-públic continua exposant només `create_project` i `get_project` de D023. Cap client Claude
-real les ha fet servir encara.
+**Estat:** **19 eines al codi, 13 desplegades.** Les 13 de D023–D026 estan publicades al
+Worker des del 2026-11-25 (verificat amb el driver real de Neon i una lectura amb la
+connexió OAuth real); falta que Claude web/app i Claude Code es reconnectin i les provin.
+Les 6 de D027–D028 (marcades *codi*) estan provades localment (client MCP oficial contra
+simulador, PostgreSQL local i workerd amb 19 eines), però **no desplegades**.
 
-Totes porten el prefix `jarvis.` (per exemple, `jarvis.list_tasks`). Les eines de lectura
-declaren l'anotació MCP `readOnlyHint` (indica al client que no canvien res).
+Totes porten el prefix `jarvis.` (per exemple, `jarvis.list_tasks`). 8 eines de lectura
+declaren l'anotació MCP `readOnlyHint` (indica al client que no canvien res). `export_data`
+tampoc canvia res, però **no la declara expressament**: retorna totes les dades de cop i volem
+que el client demani permís abans.
 
 | Eina | Tipus | Entrada (`?` = opcional) | Retorna |
 | --- | --- | --- | --- |
@@ -28,20 +31,35 @@ declaren l'anotació MCP `readOnlyHint` (indica al client que no canvien res).
 | `list_projects` | lectura | `status?`, `query?`, `limit?` | `{projects, truncated}` |
 | `update_project` | escriptura | `project_id` + almenys un de `name`, `description`, `status`, `priority`, `review_at`, `snoozed_until` | projecte |
 | `get_project_overview` | lectura | `project_id` | `{project, open_tasks, notes, truncated}` |
-| `create_task` | escriptura | `title`, `notes?`, `project_id?`, `due_date?`, `priority?`, `idempotency_key?` | tasca |
-| `list_tasks` | lectura | `project_id?`, `status?`, `due_before?`, `limit?` | `{tasks, truncated}` |
-| `update_task` | escriptura | `task_id` + almenys un de `title`, `notes`, `status`, `priority`, `due_date`, `project_id` | tasca |
-| `save_note` | escriptura | `kind`, `content`, `project_id?`, `source?`, `idempotency_key?` | nota |
-| `search_notes` | lectura | `query?`, `kind?`, `project_id?`, `include_inactive?`, `limit?` | `{notes, truncated}` |
+| `create_task` | escriptura | `title`, `notes?`, `project_id?`, `course_id?`, `due_date?`, `priority?`, `idempotency_key?` | tasca |
+| `list_tasks` | lectura | `project_id?`, `course_id?`, `status?`, `due_before?`, `limit?` | `{tasks, truncated}` |
+| `update_task` | escriptura | `task_id` + almenys un de `title`, `notes`, `status`, `priority`, `due_date`, `project_id`, `course_id` | tasca |
+| `save_note` | escriptura | `kind`, `content`, `project_id?`, `course_id?`, `source?`, `idempotency_key?` | nota |
+| `search_notes` | lectura | `query?`, `kind?`, `project_id?`, `course_id?`, `include_inactive?`, `limit?` | `{notes, truncated}` |
 | `update_note` | escriptura | `note_id` + almenys un de `content`, `kind`, `status` | nota |
 | `get_daily_summary` | lectura | `date?` | resum del dia |
 | `send_daily_summary` | escriptura externa | cap | `{sent, date}` |
+| `create_course` *(codi)* | escriptura | `name`, `code?`, `term?`, `notes?`, `idempotency_key?` | assignatura |
+| `list_courses` *(codi)* | lectura | `status?` (per defecte actives), `query?` (nom o codi), `limit?` | `{courses, truncated}`, cada una amb els seus grups actius |
+| `update_course` *(codi)* | escriptura | `course_id` + almenys un de `name`, `code`, `term`, `notes`, `status` | assignatura |
+| `save_course_group` *(codi)* | escriptura | `course_id`, `kind`, `label?`, `teacher?`, `schedule?`, `location?`, `status?` | grup (creat o actualitzat) |
+| `get_course_overview` *(codi)* | lectura | `course_id` | `{course, open_tasks, notes, truncated}` |
+| `export_data` *(codi)* | lectura | cap | exportació completa |
+
+Canvis d'entrada *(codi)*: `create_task`, `list_tasks`, `update_task`, `save_note` i
+`search_notes` accepten `course_id` (a `update_task`, `null` el desvincula). Les tasques i
+notes retornades inclouen `course_id`, i les tasques de `get_daily_summary` porten
+`course_id` i `course_name`. Un lliurament o un examen és una tasca amb `course_id`; el
+context acadèmic, una nota amb `course_id`. `save_course_group` identifica el grup per
+`kind` + `label` (p. ex. seminari «S102»): tornar-lo a desar l'actualitza (i el torna a mostrar si estava `inactive`, tret que s'enviï
+`status: "inactive"`), per això no porta clau d'idempotència.
 
 Valors permesos, límits, dates (`YYYY-MM-DD` a Europe/Madrid), `null` per esborrar una
 data o un projecte, llistats amb `truncated` i semàntica d'idempotència són els del
 [contracte API](API_CONTRACT.md). L'única diferència d'entrada és que la clau opcional
 és argument de l'eina en lloc de capçalera HTTP i que els ID van com a arguments
-(`project_id`, `task_id`, `note_id`). Schemas estrictes: un camp desconegut és un error.
+(`project_id`, `task_id`, `note_id`, `course_id`). Schemas estrictes: un camp desconegut
+és un error.
 
 Les descripcions de les eines estan escrites per al model que decideix quan cridar-les
 (per exemple, `get_project_overview` diu que és la primera crida en reprendre un projecte,
@@ -59,12 +77,17 @@ protocol i schema es gestionen pel SDK. No s'ofereixen SQL lliure ni eines genè
 ## Permisos recomanats al client
 
 Claude web i Claude Code permeten triar, per eina, si es crida sempre o si demana
-aprovació. Recomanació, pendent d'aplicar quan es desplegui:
+aprovació. Recomanació, pendent d'aplicar quan els clients es reconnectin:
 
 - **Lectura** (`get_project`, `list_projects`, `get_project_overview`, `list_tasks`,
-  `search_notes`, `get_daily_summary`): «Always allow». No canvien res.
+  `search_notes`, `get_daily_summary`, `list_courses`, `get_course_overview`): «Always
+  allow». No canvien res.
 - **Escriptura** (`create_project`, `update_project`, `create_task`, `update_task`,
-  `save_note`, `update_note`): «Needs approval», per veure què es desa abans que es desi.
+  `save_note`, `update_note`, `create_course`, `update_course`, `save_course_group`):
+  «Needs approval», per veure què es desa abans que es desi.
+- **`export_data`**: «Needs approval» encara que no canviï res (per això no declara `readOnlyHint`), perquè
+  retorna de cop totes les dades personals, inclosos els arxivats i oblidats, i així
+  l'usuari decideix quan surten cap a la conversa.
 - **`send_daily_summary`**: «Needs approval». És una **escriptura externa**: envia
   títols de tasques i projectes a Telegram, un servei fora de Jarvis, i un missatge
   enviat no es pot desfer.
@@ -100,8 +123,9 @@ del model. Documents recuperats són dades no fiables, no ordres ni permisos.
 
 ## Evolució proposada, no implementada ni aprovada
 
-Calendar, universitat (assignatures, professorat, lliuraments), entrenaments, Telegram
-bidireccional, cerca per rellevància, paginació i esborrat/exportació de dades formen
-part de la [visió](PRODUCT_VISION.md) i del [roadmap](roadmap.md). Calendar requerirà
+Calendar, horaris estructurats i qualificacions, entrenaments, Telegram bidireccional,
+cerca per rellevància i paginació formen part de la [visió](PRODUCT_VISION.md) i del
+[roadmap](roadmap.md). L'esborrat definitiu no serà una eina MCP: el fa el desenvolupador
+amb `npm run data:purge` (vegeu [DATA_MODEL](DATA_MODEL.md)). Calendar requerirà
 integració pròpia i tractament d'èxits parcials; no hi ha transacció distribuïda entre
 Jarvis i serveis externs.

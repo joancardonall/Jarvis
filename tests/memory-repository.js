@@ -176,7 +176,8 @@ export function memoryRepository() {
       const existing = groups.find(candidate => candidate.course_id === group.course_id &&
         candidate.kind === group.kind && candidate.label === group.label);
       if (existing) {
-        for (const field of ['teacher', 'schedule', 'location', 'status']) if (group[field] != null) existing[field] = group[field];
+        for (const field of ['teacher', 'schedule', 'location']) if (group[field] != null) existing[field] = group[field];
+        existing.status = group.status ?? 'active';
         existing.updated_at = now;
         return existing;
       }

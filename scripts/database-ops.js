@@ -193,6 +193,20 @@ export async function restoreData(client, snapshot) {
 // Permanently erases what the user already discarded (forgotten notes, cancelled tasks, archived
 // projects and courses with everything inside them) once it is older than `days`, plus expired
 // operational rows. With confirm = false everything runs and is rolled back: an exact preview.
+// Command-line arguments of the purge: `--days N` and `--confirm`, nothing else. Erasing needs an
+// explicit period, so a typo (`--day 90`, `--days=90`, an empty value) can never erase with a default.
+export function purgeArguments(args) {
+  let days = null;
+  let confirm = false;
+  for (let index = 0; index < args.length; index += 1) {
+    if (args[index] === '--confirm' && !confirm) confirm = true;
+    else if (args[index] === '--days' && days === null && /^\d{1,4}$/.test(args[index + 1] ?? '')) days = Number(args[++index]);
+    else throw new Error('invalid_purge_arguments');
+  }
+  if (confirm && days === null) throw new Error('invalid_purge_arguments');
+  return { days: days ?? 30, confirm };
+}
+
 export async function purgeDiscarded(client, { days, confirm = false, now = new Date() }) {
   if (!Number.isInteger(days) || days < 0 || days > 3650) throw new Error('invalid_days');
   const cutoff = new Date(now.getTime() - days * 86400000).toISOString();
@@ -201,6 +215,15 @@ export async function purgeDiscarded(client, { days, confirm = false, now = new 
   const archivedCourses = "SELECT id FROM public.courses WHERE status = 'archived' AND updated_at < $1";
   await client.query('BEGIN');
   try {
+    // A task or note inside an archived project (or course) that also belongs to a live course (or
+    // project) is still in use: it only loses the link to what is being erased.
+    const unlinked = {};
+    for (const table of ['tasks', 'notes']) {
+      unlinked[table] = await count(`UPDATE public.${table} SET project_id = NULL WHERE project_id IN (${archivedProjects})
+        AND course_id IS NOT NULL AND course_id NOT IN (${archivedCourses})`)
+        + await count(`UPDATE public.${table} SET course_id = NULL WHERE course_id IN (${archivedCourses})
+        AND project_id IS NOT NULL AND project_id NOT IN (${archivedProjects})`);
+    }
     const erased = {
       notes: await count(`DELETE FROM public.notes WHERE (status = 'inactive' AND updated_at < $1)
         OR project_id IN (${archivedProjects}) OR course_id IN (${archivedCourses})`),
@@ -213,10 +236,10 @@ export async function purgeDiscarded(client, { days, confirm = false, now = new 
       // Connections that can no longer be used: revoked, expired, or a code that was never redeemed.
       oauth_grants: await count(`DELETE FROM public.oauth_grants WHERE revoked_at < $1 OR refresh_expires_at < $1
         OR (code_used_at IS NULL AND code_expires_at < $1)`),
-      summary_runs: await count('DELETE FROM public.summary_runs WHERE summary_date < $1::timestamptz::date'),
+      summary_runs: await count("DELETE FROM public.summary_runs WHERE summary_date < ($1::timestamptz AT TIME ZONE 'Europe/Madrid')::date"),
     };
     await client.query(confirm ? 'COMMIT' : 'ROLLBACK');
-    return { erased, confirmed: confirm, cutoff };
+    return { erased, unlinked, confirmed: confirm, cutoff };
   } catch (error) { await client.query('ROLLBACK'); throw error; }
 }
 
@@ -226,7 +249,7 @@ export async function listConnections(client, now = new Date()) {
     refresh_expires_at, revoked_at FROM public.oauth_grants ORDER BY created_at`);
   return result.rows.map(row => ({
     id: row.id, created_at: row.created_at.toISOString(),
-    client: new URL(row.redirect_uri).hostname,
+    client: URL.canParse(row.redirect_uri) ? new URL(row.redirect_uri).hostname : 'unknown',
     last_renewed_at: (row.refresh_rotated_at ?? row.code_used_at)?.toISOString() ?? null,
     status: row.revoked_at ? 'revoked' : !row.code_used_at ? 'never_completed'
       : row.refresh_expires_at <= now ? 'expired' : 'active',

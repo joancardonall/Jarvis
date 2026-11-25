@@ -77,8 +77,9 @@ export function createTaskService(repository, clock = Date.now) {
       const row = await repository.updateTask(owner, task_id, changes, new Date(clock()));
       if (row) return taskView(row);
       // Nothing changed: the task, the new project or the new course is missing or belongs to someone else.
-      const missing = await missingLink(owner, changes);
-      throw missing.code === 'project_not_found' && !changes.project_id ? new AppError(404, 'task_not_found') : missing;
+      if (changes.course_id && !await repository.getCourse(owner, changes.course_id)) throw new AppError(404, 'course_not_found');
+      if (changes.project_id && !await repository.get(owner, changes.project_id)) throw new AppError(404, 'project_not_found');
+      throw new AppError(404, 'task_not_found');
     },
   };
 }

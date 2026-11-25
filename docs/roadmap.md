@@ -6,21 +6,30 @@ D023 (OAuth 2.1 amb GitHub per als connectors de Claude) està **desplegada i ve
 amb Claude web/app i amb Claude Code: crear en un xat i recuperar en un altre funciona.
 
 D024–D026 (gestió de projectes, tasques, notes, resum de projecte, resum diari, enviament
-opcional per Telegram i còpia format 2) estan **implementades a la branca `feat/jarvis-core`
-i provades localment** amb simuladors i PostgreSQL local. **Pendents de desplegament:** la
-migració 003 no s'ha aplicat a Neon i Telegram real, el Cron Trigger real i els clients
-Claude amb les 13 eines no s'han validat. La mesura de CPU continua pendent.
+opcional per Telegram i còpia format 2) estan **desplegades** des del 2026-11-25: migració 003
+aplicada a Neon i Worker publicat amb 13 eines i el Cron Trigger. **Pendent:** que Claude
+web/app i Claude Code es reconnectin i provin les 13 eines, i configurar i validar Telegram
+(sense Telegram, el cron no envia res).
+
+D027–D028 (política de dades amb exportació, purga i gestió de connexions OAuth, còpia
+format 3, i assignatures amb grups, lliuraments i notes acadèmiques) estan **implementades a
+la branca `feat/data-policy-university` i provades localment** amb simuladors i PostgreSQL
+local. **Pendents:** el desplegament (la migració 004 no s'ha aplicat a Neon) i que l'usuari
+confirmi la política de dades, que ara és una proposta amb valors per defecte. Fins llavors,
+només dades fictícies.
 
 Ordre dels increments que queden (segons el pla de producte):
 
-1. Desplegar D024–D026 i validar-les amb Claude web, Claude Code i Telegram reals (passos a
-   [DEVELOPMENT](DEVELOPMENT.md#tasques-notes-i-resum-diari--d024d026)).
-2. Política de dades personals i manteniment d'OAuth: neteja de connexions caducades i
-   revocació sense SQL.
-3. Model d'universitat i Google Calendar dins del resum diari.
-4. Aplicació web (PWA) amb inici de sessió.
-5. Entrenaments i importació de Hevy.
-6. Garmin i Gmail, només si se'n verifica l'accés real.
+1. Desplegar D027–D028 i validar-les amb Claude web i Claude Code reals; confirmar la
+   política de dades abans de posar-hi dades reals (passos a
+   [DEVELOPMENT](DEVELOPMENT.md#política-de-dades-i-universitat--d027d028)).
+2. Google Calendar dins del resum diari.
+3. Aplicació web (PWA) amb inici de sessió.
+4. Entrenaments i importació de Hevy.
+5. Garmin i Gmail, només si se'n verifica l'accés real.
+
+Petits pendents: límit de peticions (rate limiter), paginació real a les
+llistes i mesura de CPU del Worker publicat.
 
 Cada funcionalitat nova necessita aprovació del seu abast abans del codi.
 
@@ -39,11 +48,16 @@ Estat executable i verificacions a [CURRENT_STATE.md](CURRENT_STATE.md).
 
 ## Fase 1 — Circuit complet de projectes
 
-- Projectes, tasques i decisions persistents: **fet en codi** (D024: projectes amb estat i
-  prioritat, tasques, notes de memòria, resum de projecte); **pendent de desplegar**.
+- Projectes, tasques i decisions persistents: **fet i desplegat** (D024: projectes amb estat
+  i prioritat, tasques, notes de memòria, resum de projecte); validació amb els clients reals
+  **pendent**.
 - API i MCP autenticats (OAuth amb GitHub, D023, desplegat i verificat amb Claude web/app i
   Claude Code). D024 passa de 2 a 13 eines (més que les 4–8 previstes inicialment, per cobrir
-  tasques i memòria); **pendent de desplegar**.
+  tasques i memòria): **desplegades**. D027–D028 en porten 19: **fet en codi, pendent de
+  desplegar**.
+- Política de dades (D027: descartar a l'app, purga definitiva per part del desenvolupador,
+  exportació, revocació de connexions sense SQL, còpia format 3): **fet en codi, pendent de
+  desplegar i de la confirmació de l'usuari**.
 - Vista web mínima per comprovar dades (no dashboard extens): **pendent** (increment 4, PWA).
 - Crear des d'un client, recuperar en xat nou, modificar i verificar persistència: fet amb
   projectes (D023); amb tasques i notes, **pendent** de validar amb clients reals.
@@ -53,17 +67,22 @@ Estat executable i verificacions a [CURRENT_STATE.md](CURRENT_STATE.md).
 ## Fase 2 — Proactivitat
 
 - Regles d'inactivitat, prioritats, projectes pausats i supressió de duplicats: **fet en
-  codi** (D025: resum diari per regles, sense IA); pendent de desplegar.
+  codi i desplegat** (D025: resum diari per regles, sense IA).
 - Cron i bot Telegram amb missatge diari real: **fet en codi i provat amb Telegram simulat**;
-  bot, Cron Trigger real i missatge real **pendents**.
+  el Cron Trigger està desplegat, però el bot no està configurat i el missatge real
+  **pendent**.
 - Ajustar utilitat del resum amb ús durant 7 dies: **pendent** (després del desplegament).
 
 **Sortida:** 7 resums sense pèrdues/duplicats injustificats i amb baix soroll.
 
 ## Fase 3 — Universitat i Calendar
 
-- Model mínim d'assignatures, grups, professors i treballs.
-- Accions conversacionals via connector Calendar; integració backend separada si cal per als resums.
+- Model mínim d'assignatures, grups, professors i treballs: **fet en codi** (D028:
+  assignatures, grups per tipus i etiqueta, lliuraments i exàmens com a tasques, context
+  acadèmic com a notes, al resum diari amb el nom de l'assignatura); **pendent de desplegar**.
+  Sense horari estructurat ni qualificacions.
+- Accions conversacionals via connector Calendar; integració backend separada si cal per als
+  resums: **pendent** (següent increment).
 - Gestió de dates ambigües i errors parcials.
 
 ## Fase 4 — Entrenaments

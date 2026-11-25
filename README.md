@@ -9,11 +9,14 @@ es consulta exclusivament a [CURRENT_STATE](docs/CURRENT_STATE.md).
 
 Cloudflare Worker JavaScript amb API HTTP i MCP Streamable HTTP, SQL explícit sobre Neon
 PostgreSQL i autenticació OAuth 2.1 amb inici de sessió de GitHub (D023), pensat per
-connectar Claude. Al codi (D024–D026, versió 0.2.0) Jarvis gestiona projectes (llistar,
-cercar, pausar, arxivar, prioritzar), tasques amb venciment, notes de memòria explícita
-(decisions, preguntes obertes, fets, preferències), la vista d'un projecte i un resum diari
-per regles que es pot enviar per Telegram. 13 eines MCP i les rutes API equivalents, amb
-idempotència opcional i aïllament per propietari. Només dades fictícies.
+connectar Claude. Jarvis gestiona projectes (llistar, cercar, pausar, arxivar,
+prioritzar), tasques amb venciment, notes de memòria explícita (decisions, preguntes
+obertes, fets, preferències), la vista d'un projecte i un resum diari per regles que es pot
+enviar per Telegram: 13 eines MCP i les rutes API equivalents, amb idempotència opcional i
+aïllament per propietari. Al codi (D027–D028, versió 0.3.0) hi afegeix assignatures amb
+grups i professorat, lliuraments com a tasques de l'assignatura, exportació de totes les
+dades i operacions de política de dades per al desenvolupador (purga del que s'ha
+descartat i gestió de connexions OAuth): 19 eines. Només dades fictícies.
 
 Amb Node >=22.19.0 i npm:
 
@@ -26,11 +29,11 @@ npm run build
 ```
 
 Les proves PostgreSQL dedicades i la configuració d'execució estan a la
-[guia de desenvolupament](docs/DEVELOPMENT.md). **Estat:** la versió publicada és encara la
-de D023 (2 eines: crear i recuperar projectes), verificada amb Claude web/app i Claude Code.
-D024–D026 estan implementats i provats localment (simuladors i PostgreSQL local), però
-**no desplegats**: la migració 003 no s'ha aplicat a Neon i Telegram i els clients Claude
-reals no s'han provat amb les eines noves. `npm run dev` arrenca en loopback; sense
+[guia de desenvolupament](docs/DEVELOPMENT.md). **Estat:** desplegat = D023–D026 (13 eines,
+migració 003 a Neon, publicat el 2026-11-25); falta que Claude web/app i Claude Code provin
+les 13 eines i Telegram no està configurat. Al codi però **no desplegat** = assignatures,
+exportació i operacions de política de dades (D027–D028), provats localment amb
+simuladors i PostgreSQL local; la migració 004 no s'ha aplicat a Neon. `npm run dev` arrenca en loopback; sense
 secrets, només salut és operativa.
 
 ## Documents principals

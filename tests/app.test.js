@@ -22,7 +22,8 @@ test('API create -> MCP get; MCP create -> new API instance get', async () => {
       'jarvis.save_course_group', 'jarvis.save_note', 'jarvis.search_notes', 'jarvis.send_daily_summary',
       'jarvis.update_course', 'jarvis.update_note', 'jarvis.update_project', 'jarvis.update_task']);
     // Read-only tools are declared as such so clients can allow them without confirmation.
-    assert.deepEqual(tools.filter(t => t.annotations?.readOnlyHint).map(t => t.name).sort(), ['jarvis.export_data',
+    // export_data is left out on purpose: it returns everything at once, so clients should ask first.
+    assert.deepEqual(tools.filter(t => t.annotations?.readOnlyHint).map(t => t.name).sort(), [
       'jarvis.get_course_overview', 'jarvis.get_daily_summary', 'jarvis.get_project', 'jarvis.get_project_overview',
       'jarvis.list_courses', 'jarvis.list_projects', 'jarvis.list_tasks', 'jarvis.search_notes']);
     const read = await client.callTool({ name: 'jarvis.get_project', arguments: { project_id: first.id } });

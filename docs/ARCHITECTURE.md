@@ -2,11 +2,17 @@
 
 **Aprovada:** D011–D014, D023 (inici de sessió OAuth amb GitHub) i D024–D026 (projectes,
 tasques, notes, resum diari, Telegram i còpia format 2) a [DECISIONS](DECISIONS.md).
+D027 (política de dades) i D028 (universitat) són **implementades al codi**; D027 és una
+proposta amb valors per defecte pendent de confirmar per l'usuari.
 Evidència i limitacions a [CURRENT_STATE](CURRENT_STATE.md). Aquest document explica
-l'estructura, no certifica desplegament. El codi OAuth (D023) està publicat al Worker
-des del 2026-11-24 i verificat amb Claude web/app. El codi de D024–D026 està
-**implementat i provat localment** (simuladors i PostgreSQL local), però **no desplegat**:
-el Worker públic continua exposant només les 2 eines de D023.
+l'estructura, no certifica desplegament.
+
+- **Desplegat:** D023 (des del 2026-11-24, verificat amb Claude web/app i Claude Code) i
+  D024–D026 (migració 003 a Neon i Worker publicat el 2026-11-25, 13 eines i cron
+  registrat). Falta que els clients Claude reals provin les 13 eines; Telegram no està
+  configurat.
+- **Implementat i provat localment, no desplegat:** D027–D028 (assignatures, exportació,
+  purga, gestió de connexions i còpia format 3; 19 eines). La migració 004 no és a Neon.
 
 ```mermaid
 flowchart TD
@@ -17,7 +23,7 @@ flowchart TD
     OAuth -. identitat .-> GitHub[GitHub: proveïdor d'identitat extern]
     API --> Auth[Autenticació: access token OAuth o token fix opcional]
     MCP --> Auth
-    Auth --> Services[Serveis compartits: projectes, tasques, notes, resum]
+    Auth --> Services[Serveis compartits: projectes, tasques, notes, assignatures, resum, exportació]
     Cron[Cron Trigger de Cloudflare: 4 cops cada matí] --> Scheduled[Resum programat: scheduled → src/telegram.js]
     Scheduled --> Services
     Services -. enviament a demanda .-> Telegram[Telegram Bot API: servei extern]
@@ -47,13 +53,16 @@ hi ha secrets configurats.
   crea el repository només al primer ús (una petició rebutjada abans no obre BD), envia
   `/mcp` a `mcp.js` i la resta a `api.js`. També exporta `scheduled`, que crida el cron.
 - `src/api.js`: adaptador HTTP de les rutes `/api/v1/…` cap als serveis.
-- `src/mcp.js`: servidor i transport oficial; registre de les 13 eines sobre els mateixos serveis.
+- `src/mcp.js`: servidor i transport oficial; registre de les 19 eines sobre els mateixos serveis
+  (13 de desplegades i 6 de D027–D028 només al codi).
 - `src/services.js`: munta tots els serveis sobre un sol repository i afegeix la vista
-  conjunta d'un projecte (`overview`).
+  conjunta d'un projecte (`overview`) i l'**exportació** (`exportData`): tot el que Jarvis
+  guarda del propietari, inclosos arxivats i inactius, en la mateixa forma pública.
 - `src/validation.js`: regles d'entrada compartides (UUID, prioritat, `limit`, dates de
   calendari) i càlcul de la data i l'hora de Madrid.
-- `src/projects.js`, `src/tasks.js`, `src/notes.js`: schemas estrictes, validació,
-  empremta d'idempotència i resposta pública de cada entitat.
+- `src/projects.js`, `src/tasks.js`, `src/notes.js`, `src/courses.js`: schemas estrictes,
+  validació, empremta d'idempotència i resposta pública de cada entitat. `courses.js`
+  inclou els grups d'una assignatura i la seva vista conjunta (`overview`).
 - `src/summary.js`: resum diari per regles i plantilles, sense IA.
 - `src/telegram.js`: enviament a Telegram (a demanda i programat) amb el registre diari.
 - `src/oauth.js`: servidor d'autorització: metadades, registre de clients, pantalla de
@@ -64,13 +73,15 @@ hi ha secrets configurats.
   valida caducitat i retorna el propietari configurat.
 - `src/repository.js`: SQL de creació/lectura de projectes (Neon executa la creació dins
   una transacció explícita) i d'`oauth_grants` (`grantOperations`); munta el repository Neon.
-- `src/domain-repository.js`: SQL de llistats, edicions, tasques, notes i registre del
-  resum diari, compartit per Neon i les proves PostgreSQL.
-- `migrations/001_projects.sql`, `002_oauth_grants.sql` i `003_tasks_notes_summary.sql`:
-  esquema revisable; no s'aplica a l'arrencada.
+- `src/domain-repository.js`: SQL de llistats, edicions, tasques, notes, assignatures i
+  grups, exportació i registre del resum diari, compartit per Neon i les proves PostgreSQL.
+- `migrations/001_projects.sql`, `002_oauth_grants.sql`, `003_tasks_notes_summary.sql` i
+  `004_courses.sql`: esquema revisable; no s'aplica a l'arrencada.
 - `scripts/provision.js`, `db.js` i `database-ops.js`: preparació operativa,
-  migració amb ledger, permisos runtime, còpia format 2 i restauració acotada, sempre per
-  ordres explícites.
+  migració amb ledger, permisos runtime, còpia format 3 i restauració acotada, purga del
+  que s'ha descartat (`npm run data:purge`) i llistat/revocació de connexions OAuth
+  (`npm run oauth:connections`, `oauth:revoke`), sempre per ordres explícites del
+  desenvolupador i mai des del Worker.
 - `scripts/oauth-setup.js`: prepara un fitxer privat amb la clau de signatura OAuth.
 - `scripts/telegram-setup.js`: prepara el fitxer privat amb el token del bot i desa el
   `chat_id` (`npm run telegram:setup` i `telegram:chat`).
@@ -87,7 +98,23 @@ propietari/clau fa una actualització sense canvis i retorna la fila original so
 SQL. El servei compara empremtes i retorna conflicte si el contingut és diferent.
 Això funciona amb concurrència entre instàncies sense memòria compartida.
 No actualitza `updated_at` en reintents. Sense clau, PostgreSQL admet múltiples NULL.
-Projectes, tasques i notes segueixen el mateix patró.
+Projectes, tasques, notes i assignatures segueixen el mateix patró.
+
+### Grups d'assignatura: *upsert* per clau natural (D028)
+
+Un **upsert** és «insereix o, si ja existeix, actualitza» en una sola sentència
+(`INSERT … ON CONFLICT … DO UPDATE`). Una **clau natural** és una combinació de dades que ja
+identifica la fila pel seu significat, sense inventar cap identificador. Un grup
+d'assignatura s'identifica per (assignatura, tipus, etiqueta): `UNIQUE (course_id, kind,
+label)` a `004_courses.sql`.
+
+Exemple: «el seminari S102 de Sistemes Operatius el fa la Marta». `save_course_group` amb
+`kind: seminar` i `label: S102` crea el grup; si el client repeteix la petició (per un
+timeout o perquè el model la torna a enviar), la segona xoca amb la mateixa clau i
+s'actualitza en lloc de duplicar-se. Desar-lo de nou el dia que canvia el professor també
+és una actualització. Per això els grups no necessiten clau d'idempotència: repetir-la deixa
+el mateix resultat. Només es canvien els camps enviats; els omesos conserven el valor.
+Provat amb 10 desats simultanis del mateix grup → 1 fila (PostgreSQL local).
 
 ### Cada escriptura és una sola sentència SQL
 
@@ -110,14 +137,15 @@ una activitat sense tasca.
 1. **A les consultes**: totes les sentències filtren per `owner_id`, que surt del token,
    mai del client.
 2. **A la BD**: tasques i notes apunten al projecte amb una **clau forana composta**
-   `(project_id, owner_id)` → `projects (id, owner_id)`. Una clau forana és una regla
+   `(project_id, owner_id)` → `projects (id, owner_id)` (i igual amb `course_id` cap a
+   `courses`; els grups cap a la seva assignatura). Una clau forana és una regla
    de la BD que impedeix apuntar a una fila que no existeix; en ser composta, la fila ha
    de tenir també el mateix propietari. Encara que una consulta tingués un error, la BD
    rebutjaria lligar una tasca al projecte d'un altre propietari.
 
 Detall de taules i permisos a [DATA_MODEL](DATA_MODEL.md).
 
-### Resum diari programat (D025, implementat, no desplegat)
+### Resum diari programat (D025, desplegat el 2026-11-25)
 
 Un **Cron Trigger** de Cloudflare és una ordre perquè la plataforma desperti el Worker a
 hores fixes (`30 5-8 * * *` a `wrangler.jsonc`: 05:30, 06:30, 07:30 i 08:30 UTC). Les
@@ -137,7 +165,8 @@ l'estiu). Per això el Worker es desperta quatre cops i decideix ell mateix:
 
 Si el Worker s'atura entre reclamar i enviar, la fila queda `sending` i aquell dia no
 s'envia: es prefereix cap missatge a un duplicat. Regles del resum a
-[AUTOMATIONS](AUTOMATIONS.md). El Cron Trigger real **no està verificat**.
+[AUTOMATIONS](AUTOMATIONS.md). El Cron Trigger està registrat al Worker publicat, però com
+que Telegram no està configurat (pas 1) encara **no s'ha verificat cap enviament real**.
 
 ## Flux d'inici de sessió OAuth (D023, desplegat, verificat amb Claude web/app)
 
@@ -166,12 +195,16 @@ El propietari de les dades continua sent `DEV_OWNER_ID`: el login no crea usuari
 
 ## Decisions de simplicitat
 
-SQL explícit i poques taules de domini (`projects`, `tasks`, `notes`) més dues d'estat
-operatiu (`oauth_grants`, `summary_runs`). Res no s'esborra: projectes i tasques
-s'arxiven o es cancel·len i les notes es desactiven. No hi ha taula d'esdeveniments,
+SQL explícit i poques taules de domini (`projects`, `tasks`, `notes`, i al codi
+`courses` i `course_groups`) més dues d'estat operatiu (`oauth_grants`, `summary_runs`).
+L'aplicació no esborra res: projectes i assignatures s'arxiven, les tasques es cancel·len
+i notes i grups es desactiven. L'esborrat definitiu el fa només el desenvolupador amb
+`npm run data:purge` (D027, cicle de vida a [DATA_MODEL](DATA_MODEL.md)), de manera que un
+error de la IA no pot destruir dades. No hi ha taula d'esdeveniments,
 cua ni repository genèric: els ports de repository són objectes amb funcions SQL
 concretes, sense jerarquia de classes. Les edicions no són idempotents per clau: tornar
 a enviar el mateix canvi deixa el mateix resultat, però actualitza `updated_at`.
 
-La [visió](PRODUCT_VISION.md) conserva app web, universitat, entrenaments, calendari,
-integracions i Telegram bidireccional; les fases són al [roadmap](roadmap.md).
+La [visió](PRODUCT_VISION.md) conserva app web, la resta d'universitat (horaris
+estructurats, qualificacions), entrenaments, calendari, integracions i Telegram
+bidireccional; les fases són al [roadmap](roadmap.md).

@@ -23,6 +23,52 @@ connexió amb Claude Code, ara disponible; només dades fictícies i pla Free.
 **Publicat i verificat:** crear i recuperar projectes amb OAuth de GitHub (D023), des de Claude
 web/app i Claude Code. **Publicat el 2026-11-25, pendent de validar amb els clients:** llistar i editar projectes,
 tasques, notes i resum diari (D024–D026). Telegram implementat però no configurat.
+**Implementat i provat localment, no desplegat:** universitat, exportació, purga i gestió de
+connexions (D027–D028).
+
+## Política de dades i universitat (D027–D028) — implementat i provat localment; no desplegat
+
+Demanat per l'usuari el 2026-11-25 («continua amb el bloc 2 i 3»). Branca
+`feat/data-policy-university`, **no pujada a GitHub**. No autoritzat encara: pujar la branca,
+aplicar la migració 004 a Neon, desplegar ni desar dades reals. Decisions a
+[DECISIONS](DECISIONS.md) (D027, D028); passos de posada en marxa a [DEVELOPMENT](DEVELOPMENT.md).
+
+**Implementat:**
+- Universitat: assignatures, grups amb professor, horari i lloc; lliuraments i exàmens com a
+  tasques amb `course_id`; context acadèmic com a notes amb `course_id`; el resum diari mostra
+  el nom de l'assignatura. 6 eines MCP noves (19 en total) i rutes HTTP equivalents.
+- Exportació completa (`export_data`, `GET /api/v1/export`), 1.000 files per taula.
+- Ordres del desenvolupador: `data:purge` (previsualitza per defecte), `oauth:connections`,
+  `oauth:revoke`. Còpia format 3; el format 2 continua sent restaurable.
+- Migració `004_courses.sql` i permisos per columnes a les taules noves.
+- Política de dades escrita a [SECURITY_PRIVACY](SECURITY_PRIVACY.md), **com a proposta**.
+
+**Revisió independent (2026-11-25):** cap troballa crítica ni alta; l'aïllament entre
+propietaris es va comprovar amb proves de concepte sobre PostgreSQL. Corregit amb proves:
+arguments de la purga estrictes i `--confirm` amb `--days` obligatori; la purga ja no esborra
+tasques o notes que també pertanyen a un projecte o assignatura vius (les desvincula); codi
+d'error correcte en actualitzar una tasca inexistent; un grup amagat es torna a mostrar en
+desar-lo; exportació reduïda i sense `readOnlyHint`; el resum avisa si hi ha més de 200
+assignatures; descripcions d'eines completades. **No corregit, acceptat:** les etiquetes de
+grup distingeixen majúscules («S102» i «s102» són dos grups); l'empremta de les còpies detecta
+corrupció, no manipulació deliberada; l'exportació no té paginació.
+
+**Verificat localment (2026-11-25, Node 26.13.1, PostgreSQL 17 local i descartable):**
+
+| Ordre | Resultat |
+| --- | --- |
+| `npm test` | 55/55 (18 API/MCP, 14 OAuth, 14 domini, 9 operatives), 3 execucions seguides |
+| `npm run test:postgres` | 3/3 |
+| `npm run test:ops` | 1/1 (rols reals, permisos negatius, còpia i restauració, connexions, purga) |
+| `npm run test:worker` | 1/1 en workerd, 19 eines |
+| `npm run check`, `npm run build` | Correctes |
+
+**No verificat:** res d'això sobre Neon ni al Worker públic; `scripts/verify-neon.js` ampliat
+no s'ha executat; les ordres `data:purge`, `oauth:connections` i `oauth:revoke` només s'han
+provat com a funcions sobre PostgreSQL local; cap client Claude real ha vist les 19 eines.
+
+**Pendent de l'usuari:** aprovar pujar la branca, migrar i desplegar; confirmar la política
+de dades (30 dies abans de purgar, 90 dies de còpies, dades que no s'hi desen).
 
 ## Projectes, tasques, memòria, resum i Telegram (D024–D026) — desplegat; clients i Telegram pendents
 
@@ -339,6 +385,10 @@ D023 publicada, verificada amb Claude web/app i Claude Code i fusionada a main.
 D024–D026 implementades i pujades a la branca `feat/jarvis-core` el 2026-11-25, sense
 desplegar ni fusionar. La branca també conté el registre de la validació de Claude Code
 (`docs/claude-code-validation`), que tampoc és a main.
+
+D027–D028 implementades a `feat/data-policy-university` (surt de `feat/jarvis-core`), amb
+revisió independent aplicada; sense pujar, migrar ni desplegar. Següent: l'usuari aprova la
+posada en marxa i confirma la política de dades.
 
 Migració 003 aplicada, Worker desplegat i branca pujada el 2026-11-25. Pendent: reconnectar
 els clients, validar les 13 eines amb dades fictícies i, més endavant, activar Telegram. Després: política de dades

@@ -4,7 +4,7 @@ import { mkdtemp, stat, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { databaseUrl, writePrivate } from '../scripts/ops-config.js';
-import { packSnapshot, validateSnapshot, migrationHashes } from '../scripts/database-ops.js';
+import { packSnapshot, validateSnapshot, migrationHashes, purgeArguments } from '../scripts/database-ops.js';
 
 test('operations reject unintended databases, pooled endpoints and non-TLS remote connections', () => {
   for (const url of ['postgresql://u:p@untrusted.example/jarvis_dev?sslmode=require',
@@ -64,6 +64,18 @@ test('logical snapshot rejects corruption, wrong migrations, old formats and inv
   assert.throws(() => packSnapshot({ ...payload, projects: [{ ...project, extra: true }] }));
   assert.throws(() => packSnapshot({ ...payload, tasks: [{ ...task, due_date: '2030-1-1' }] }));
   assert.throws(() => packSnapshot({ ...payload, notes: [{ ...note, kind: 'secret' }] }));
+});
+
+test('purge arguments are strict: a typo stops the command and erasing needs an explicit period', () => {
+  assert.deepEqual(purgeArguments([]), { days: 30, confirm: false });
+  assert.deepEqual(purgeArguments(['--days', '90']), { days: 90, confirm: false });
+  assert.deepEqual(purgeArguments(['--days', '0', '--confirm']), { days: 0, confirm: true });
+  assert.deepEqual(purgeArguments(['--confirm', '--days', '45']), { days: 45, confirm: true });
+  for (const args of [['--confirm'], ['--days=90', '--confirm'], ['--day', '365', '--confirm'], ['--days', '', '--confirm'],
+    ['--days'], ['--days', 'abc'], ['--days', '--confirm'], ['--days', '-1'], ['--days', '1.5'], ['--days', '12345'],
+    ['--days', '1', '--days', '2'], ['--confirm', '--confirm', '--days', '1'], ['--days', '30', 'extra'], ['--Confirm']]) {
+    assert.throws(() => purgeArguments(args), /invalid_purge_arguments/, args.join(' '));
+  }
 });
 
 test('private output is not overwritten and has restrictive Unix permissions', async () => {

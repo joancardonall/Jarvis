@@ -344,3 +344,60 @@ sessions antigues seria un risc); `DELETE` per al runtime.
 d'una restauració cal tornar a connectar els clients. La còpia continua sent un fitxer local
 en clar: no és una política de còpies per a dades personals.
 
+
+## D027 — Política de dades personals: esborrat en dos temps, exportació i connexions — 2026-11-25
+
+**Estat:** l'usuari va demanar el 2026-11-25 continuar amb aquest bloc. Els **mecanismes estan
+implementats i provats localment; no desplegats**. Els **valors de la política són una
+proposta**: l'usuari els ha de confirmar abans de desar-hi dades personals reals.
+Política completa a [SECURITY_PRIVACY](SECURITY_PRIVACY.md); ordres a [DEVELOPMENT](DEVELOPMENT.md).
+**Context:** des de D024 Jarvis pot contenir informació personal, però «oblidar» només
+amagava i no hi havia manera d'esborrar de debò, d'exportar les dades ni de veure o tancar
+les connexions dels clients sense escriure SQL.
+**Decisió:**
+- **Esborrat en dos temps.** L'aplicació només descarta (desactivar, cancel·lar, arxivar).
+  L'esborrat definitiu el fa el desenvolupador amb `npm run data:purge`, amb el rol migrador,
+  mai el Worker ni el model. Per defecte l'ordre només previsualitza.
+- **Retenció proposada:** 30 dies entre el descart i la purga; còpies locals de més de
+  90 dies s'esborren a mà.
+- **Exportació completa** per eina MCP i per API.
+- **Connexions OAuth** llistables i revocables amb ordres; la purga també neteja les caducades.
+- **Còpies compatibles cap endavant:** format 3, i el format 2 continua sent restaurable.
+- **Dades que no s'hi han de desar:** contrasenyes, credencials, dades bancàries, dades de
+  salut i dades sensibles de terceres persones.
+**Justificació:** un model pot equivocar-se o ser enganyat per un text maliciós; si no pot
+esborrar, el pitjor que pot fer és amagar. L'esborrat real existeix, però exigeix una ordre
+deliberada al teu ordinador. La previsualització evita esborrar a cegues.
+**Alternatives descartades:** donar `DELETE` al rol del Worker o una eina MCP d'esborrat
+(un error o una injecció destruirien dades); purga automàtica per cron (esborraria sense
+que ningú ho mirés); xifrar les còpies amb una clau pròpia (més peces a custodiar; el
+disc del portàtil ja és el límit de confiança actual).
+**Després de la revisió independent (2026-11-25):** `--confirm` exigeix `--days` explícit i
+els arguments es llegeixen de manera estricta; el que també pertany a una cosa viva es
+desvincula en lloc d'esborrar-se; l'exportació baixa a 1.000 files per taula i no es declara
+de lectura, perquè els clients demanin permís.
+**Conseqüències:** esborrar de debò requereix el portàtil i les credencials de migració;
+arxivar un projecte o una assignatura i purgar-lo esborra tot el que contenia; les còpies
+antigues conserven el que s'hagi purgat fins que s'esborrin els fitxers; l'exportació és
+de lectura però ho retorna tot, i convé deixar-la amb confirmació als clients.
+
+## D028 — Universitat: assignatures, grups i lliuraments — 2026-11-25
+
+**Estat:** demanada per l'usuari el 2026-11-25. **Implementada i provada localment; no
+desplegada.** Contractes a [API_CONTRACT](API_CONTRACT.md) i [MCP_CONTRACT](MCP_CONTRACT.md).
+**Decisió:** assignatures amb codi, període i notes; grups per assignatura (teoria,
+seminari, laboratori, altres) amb professor, horari i lloc. **Un lliurament o un examen és
+una tasca lligada a l'assignatura, i el context acadèmic són notes lligades a
+l'assignatura**: no hi ha taules noves per a això. Cobreix UC-04 i UC-05.
+**Justificació:** reutilitzar tasques i notes fa que els lliuraments surtin al resum diari,
+a les cerques i a l'exportació sense codi nou, i que tinguin les mateixes regles
+(venciment, prioritat, idempotència, aïllament per propietari).
+**Decisions de detall:** un grup s'identifica per assignatura, tipus i etiqueta, de manera
+que tornar-lo a desar l'actualitza en lloc de duplicar-lo (un reintent és inofensiu sense
+clau d'idempotència) i el torna a mostrar si estava amagat. L'horari és text lliure. Res s'esborra: l'assignatura s'arxiva.
+**Alternatives descartades:** taula pròpia de lliuraments (duplicaria les tasques); horari
+estructurat per franges (complexitat sense ús fins que hi hagi Calendar); model de
+qualificacions (fora de la visió).
+**Conseqüències:** de 13 a 19 eines MCP; migració 004; el professorat són noms de terceres
+persones: només dades públiques de la universitat. Calendar continua sent un bloc a part.
+

@@ -132,14 +132,20 @@ entrenaments, integracions i seguiment proactiu per Telegram.
 
 ## Increment actual i següent tasca
 
-Autoritzat i implementat: crear i recuperar projectes (D011–D014), autenticació OAuth amb
-GitHub (D023, desplegada i verificada) i el circuit complet de projectes, tasques, memòria
-explícita, resum diari i Telegram (D024–D026, implementat a la branca `feat/jarvis-core`).
-**Següent tasca:** posar en marxa D024–D026 seguint la guia de `docs/DEVELOPMENT.md` i
-validar-ho amb Claude web/app, Claude Code i Telegram reals. Publicar, pujar secrets, migrar
-la BD real i fusionar a main els executa o els confirma l'usuari.
+Desplegat i en ús: OAuth amb GitHub (D023) i el circuit de projectes, tasques, memòria i
+resum diari (D024–D026). Implementat a la branca `feat/data-policy-university`, pendent de
+desplegar: política de dades amb exportació, purga i gestió de connexions (D027) i
+universitat (D028). **Següent tasca:** posar en marxa D027–D028 seguint
+`docs/DEVELOPMENT.md` i validar-ho amb els clients reals. Publicar, pujar secrets, migrar la
+BD real i fusionar a main els executa o els confirma l'usuari.
+
+Regles que s'han de mantenir en qualsevol canvi:
+- El rol del Worker no esborra mai files ni en canvia el propietari. L'esborrat definitiu
+  només existeix com a ordre del desenvolupador (`npm run data:purge`).
+- Abans de desplegar: executar les proves, llegir-ne el resultat i, només llavors, desplegar
+  en una ordre separada. Mai encadenar el deploy darrere d'una ordre de proves filtrada.
+- Continua prohibit desar dades personals reals fins que l'usuari confirmi la política de
+  dades de `docs/SECURITY_PRIVACY.md`.
 
 Després es continua segons `docs/roadmap.md`. Cada funcionalitat nova necessita l'aprovació
-del seu abast. Continua prohibit desar dades personals reals fins que existeixi una política
-de dades (retenció, esborrat i còpies). L'estat real es consulta sempre a
-`docs/CURRENT_STATE.md`.
+del seu abast. L'estat real es consulta sempre a `docs/CURRENT_STATE.md`.

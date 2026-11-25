@@ -5,7 +5,8 @@ import { createCourseService, courseView, groupView } from './courses.js';
 import { createSummaryService } from './summary.js';
 import { parse } from './validation.js';
 
-const EXPORT_LIMIT = 5000;
+// Kept small enough for one response of the database driver and of an MCP client.
+const EXPORT_LIMIT = 1000;
 const EXPORT_VIEWS = { projects: projectView, tasks: taskView, notes: noteView, courses: courseView, course_groups: groupView };
 
 // Builds every domain service on top of one repository. API and MCP both call these services

@@ -143,7 +143,8 @@ export const UPDATE_COURSE = `
   WHERE owner_id = $1 AND id = $2
   RETURNING *`;
 // Insert or update the group identified by (course, kind, label). Fields not given keep their
-// stored value on update and start empty on insert. No row when the course is missing or foreign.
+// stored value on update and start empty on insert; saving a hidden group again shows it, unless
+// the request says inactive. No row when the course is missing or foreign.
 export const SAVE_COURSE_GROUP = `
   INSERT INTO course_groups (id, owner_id, course_id, kind, label, teacher, schedule, location, status, created_at, updated_at)
   SELECT $1::uuid, $2::uuid, $3::uuid, $4::text, $5::text, COALESCE($6::text, ''), COALESCE($7::text, ''),
@@ -151,7 +152,7 @@ export const SAVE_COURSE_GROUP = `
   WHERE EXISTS (SELECT 1 FROM courses WHERE id = $3::uuid AND owner_id = $2::uuid)
   ON CONFLICT (course_id, kind, label) DO UPDATE
   SET teacher = COALESCE($6::text, course_groups.teacher), schedule = COALESCE($7::text, course_groups.schedule),
-      location = COALESCE($8::text, course_groups.location), status = COALESCE($9::text, course_groups.status),
+      location = COALESCE($8::text, course_groups.location), status = COALESCE($9::text, 'active'),
       updated_at = $10::timestamptz
   RETURNING *`;
 export const LIST_COURSE_GROUPS = `

@@ -192,6 +192,11 @@ export async function exerciseDomainStorage(storage, createProject, owner, stran
     ['theory:', 'seminar:S1', 'lab:L1', 'lab:L2']);
   await storage.saveCourseGroup(group({ kind: 'lab', label: 'L2', status: 'inactive' }), at(24));
   assert.equal((await storage.listCourseGroups(owner, [systems.id])).length, 3);
+  // Saving a hidden group again without a status shows it again and keeps its other fields.
+  await storage.saveCourseGroup(group({ kind: 'lab', label: 'L1', teacher: 'Dr. Lab', status: 'inactive' }), at(24));
+  const shown = await storage.saveCourseGroup(group({ kind: 'lab', label: 'L1', location: 'Room 9' }), at(24));
+  assert.deepEqual([shown.status, shown.teacher, shown.location], ['active', 'Dr. Lab', 'Room 9']);
+  assert.equal((await storage.listCourseGroups(owner, [systems.id])).length, 3);
   assert.deepEqual(await storage.listCourseGroups(stranger, [systems.id]), []);
   assert.deepEqual(await storage.listCourseGroups(owner, []), []);
 

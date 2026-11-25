@@ -140,6 +140,13 @@ test('real PostgreSQL: limited roles, tracked migrations, runtime privileges and
     await services.courses.update(ownerA, { course_id: oldCourse.id, status: 'archived' });
     const exists = async (table, id) => (await migrator.query(`SELECT 1 FROM ${table} WHERE id = $1`, [id])).rowCount === 1;
     // Later than every date used by the shared scenarios (which live in 2030).
+    // Linked to something erased and to something live: kept, and only the erased link is removed.
+    const liveCourse = await services.courses.create(ownerA, { name: 'Live course' });
+    const sharedTask = await services.tasks.create(ownerA, { title: 'In doomed project and live course', project_id: doomed.id, course_id: liveCourse.id });
+    const sharedNote = await services.notes.create(ownerA, { kind: 'fact', content: 'In live project and doomed course', project_id: live.id, course_id: oldCourse.id });
+    const bothDoomed = await services.tasks.create(ownerA, { title: 'In doomed project and doomed course', project_id: doomed.id, course_id: oldCourse.id });
+    await migrator.query("UPDATE projects SET status = 'archived' WHERE id = $1", [doomed.id]);
+    await migrator.query("UPDATE courses SET status = 'archived' WHERE id = $1", [oldCourse.id]);
     const future = new Date(Date.UTC(2032, 0, 1));
 
     await assert.rejects(purgeDiscarded(migrator, { days: -1 }), /invalid_days/);
@@ -156,6 +163,12 @@ test('real PostgreSQL: limited roles, tracked migrations, runtime privileges and
     // Confirmed: discarded data and what it contained are gone; everything live remains.
     const purged = await purgeDiscarded(migrator, { days: 30, confirm: true, now: future });
     assert.deepEqual(purged.erased, preview.erased);
+    assert.deepEqual([preview.unlinked, purged.unlinked], [{ tasks: 1, notes: 1 }, { tasks: 1, notes: 1 }]);
+    assert.equal(await exists('tasks', bothDoomed.id), false);
+    assert.deepEqual((await migrator.query('SELECT project_id, course_id FROM tasks WHERE id = $1', [sharedTask.id])).rows,
+      [{ project_id: null, course_id: liveCourse.id }]);
+    assert.deepEqual((await migrator.query('SELECT project_id, course_id FROM notes WHERE id = $1', [sharedNote.id])).rows,
+      [{ project_id: live.id, course_id: null }]);
     for (const [table, id] of [['projects', doomed.id], ['tasks', inside.id], ['notes', insideNote.id], ['tasks', cancelled.id],
       ['notes', forgotten.id], ['courses', oldCourse.id], ['tasks', deliverable.id]]) {
       assert.equal(await exists(table, id), false, table);
@@ -168,6 +181,7 @@ test('real PostgreSQL: limited roles, tracked migrations, runtime privileges and
     assert.equal((await migrator.query('SELECT count(*) FROM summary_runs')).rows[0].count, '0');
     const repeat = await purgeDiscarded(migrator, { days: 30, confirm: true, now: future });
     assert.ok(Object.values(repeat.erased).every(rows => rows === 0));
+    assert.deepEqual(repeat.unlinked, { tasks: 0, notes: 0 });
     // The application keeps working after a purge.
     assert.equal((await services.overview(ownerA, { project_id: live.id })).open_tasks.length, 1);
   } finally {

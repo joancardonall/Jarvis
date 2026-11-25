@@ -3,15 +3,18 @@
 Estat de verificació a [CURRENT_STATE](CURRENT_STATE.md). Seguretat i credencials a
 [SECURITY_PRIVACY](SECURITY_PRIVACY.md); dades a [DATA_MODEL](DATA_MODEL.md).
 
-**Estat:** crear i recuperar projectes (D011–D014) està desplegat. La resta de rutes
-(D024–D026) estan **implementades i provades localment** (simuladors i PostgreSQL local),
-però **no desplegades**: el Worker públic encara no les té. API i MCP criden els mateixos
-serveis ([MCP_CONTRACT](MCP_CONTRACT.md)), per tant validació i errors són idèntics.
+**Estat:** les rutes de projectes, tasques, notes i resum diari (D011–D014 i D024–D026)
+estan **desplegades** al Worker públic des del 2026-11-25. Les rutes d'assignatures i
+d'exportació i el camp `course_id` (D027–D028) estan **implementades i provades
+localment** (simuladors i PostgreSQL local), però **no desplegades**. API i MCP criden els
+mateixos serveis ([MCP_CONTRACT](MCP_CONTRACT.md)), per tant validació i errors són
+idèntics.
 
 ## Rutes
 
 Totes porten `Authorization: Bearer` (vegeu [Autenticació](#autenticació)). Els cossos són
-JSON (`Content-Type: application/json`). No hi ha cap ruta `DELETE`.
+JSON (`Content-Type: application/json`). No hi ha cap ruta `DELETE`. Les files marcades
+amb *(codi)* són de D027–D028 i encara no estan desplegades.
 
 | Mètode i ruta | Entrada | Resposta |
 | --- | --- | --- |
@@ -21,12 +24,18 @@ JSON (`Content-Type: application/json`). No hi ha cap ruta `DELETE`.
 | GET /api/v1/projects/{id} | UUID | 200 projecte; 404 si absent o d'un altre propietari |
 | PATCH /api/v1/projects/{id} | Almenys un de `name`, `description`, `status`, `priority`, `review_at`, `snoozed_until` | 200 projecte |
 | GET /api/v1/projects/{id}/overview | UUID | 200 `{project, open_tasks, notes, truncated}` |
-| POST /api/v1/tasks | `title`, `notes?`, `project_id?`, `due_date?`, `priority?`; `Idempotency-Key?` | 201 tasca, també en replay |
-| GET /api/v1/tasks | Query `project_id?`, `status?`, `due_before?`, `limit?` | 200 `{tasks, truncated}` |
-| PATCH /api/v1/tasks/{id} | Almenys un de `title`, `notes`, `status`, `priority`, `due_date`, `project_id` | 200 tasca |
-| POST /api/v1/notes | `kind`, `content`, `project_id?`, `source?`; `Idempotency-Key?` | 201 nota, també en replay |
-| GET /api/v1/notes | Query `query?`, `kind?`, `project_id?`, `include_inactive?`, `limit?` | 200 `{notes, truncated}` |
+| POST /api/v1/tasks | `title`, `notes?`, `project_id?`, `course_id?` *(codi)*, `due_date?`, `priority?`; `Idempotency-Key?` | 201 tasca, també en replay |
+| GET /api/v1/tasks | Query `project_id?`, `course_id?` *(codi)*, `status?`, `due_before?`, `limit?` | 200 `{tasks, truncated}` |
+| PATCH /api/v1/tasks/{id} | Almenys un de `title`, `notes`, `status`, `priority`, `due_date`, `project_id`, `course_id` *(codi)* | 200 tasca |
+| POST /api/v1/notes | `kind`, `content`, `project_id?`, `course_id?` *(codi)*, `source?`; `Idempotency-Key?` | 201 nota, també en replay |
+| GET /api/v1/notes | Query `query?`, `kind?`, `project_id?`, `course_id?` *(codi)*, `include_inactive?`, `limit?` | 200 `{notes, truncated}` |
 | PATCH /api/v1/notes/{id} | Almenys un de `content`, `kind`, `status` | 200 nota |
+| POST /api/v1/courses *(codi)* | `name`, `code?`, `term?`, `notes?`; `Idempotency-Key?` | 201 assignatura, també en replay |
+| GET /api/v1/courses *(codi)* | Query `status?`, `query?`, `limit?` | 200 `{courses, truncated}` |
+| PATCH /api/v1/courses/{id} *(codi)* | Almenys un de `name`, `code`, `term`, `notes`, `status` | 200 assignatura |
+| GET /api/v1/courses/{id}/overview *(codi)* | UUID | 200 `{course, open_tasks, notes, truncated}` |
+| PUT /api/v1/courses/{id}/groups *(codi)* | `kind`, `label?`, `teacher?`, `schedule?`, `location?`, `status?` | 200 grup (creat o actualitzat) |
+| GET /api/v1/export *(codi)* | Cap | 200 exportació completa |
 | GET /api/v1/daily-summary | Query `date?` | 200 resum del dia |
 | POST /api/v1/daily-summary/send | Sense cos | 200 `{"sent":true,"date":"YYYY-MM-DD"}` |
 
@@ -64,8 +73,13 @@ notes actives, amb `truncated: true` si n'hi ha més.
 de ser un projecte propi; a `PATCH`, `null` desvincula la tasca i `due_date: null` treu el
 venciment. Les tasques no s'esborren: es cancel·len.
 
-Resposta: `id`, `project_id`, `title`, `notes`, `status`, `priority`, `due_date`,
-`created_at`, `updated_at`, `completed_at`.
+Resposta: `id`, `project_id`, `course_id` *(codi)*, `title`, `notes`, `status`,
+`priority`, `due_date`, `created_at`, `updated_at`, `completed_at`.
+
+`course_id` *(codi)* vincula la tasca a una assignatura pròpia: un lliurament o un examen és
+una tasca amb `course_id`. Una tasca pot tenir projecte, assignatura, tots dos o cap. A
+`PATCH`, `course_id: null` la desvincula. Si l'assignatura no existeix o és d'un altre
+propietari, 404 `course_not_found`.
 
 Llistat: per defecte només obertes; `status` pot ser `open`, `done`, `cancelled` o `all`.
 `due_before` retorna les que vencen aquell dia o abans (les que no tenen data queden fora).
@@ -76,11 +90,42 @@ Ordre: venciment (sense data al final), després prioritat (alta primer).
 `kind`: `decision` (decisió confirmada), `open_question` (decisió pendent), `fact`,
 `preference` o `note`. `content`: 1–4.000 caràcters, no només espais. `source`: d'on ve
 la informació, fins a 200. `status`: `active` o `inactive`; «oblidar» és `inactive` (no
-s'esborra, es pot tornar a `active`). El projecte d'una nota no es pot canviar.
+s'esborra, es pot tornar a `active`). El projecte d'una nota no es pot canviar, ni la seva
+assignatura (`course_id` *(codi)*, per al context acadèmic: «l'examen val el 40%»).
 
-Resposta: `id`, `project_id`, `kind`, `content`, `source`, `status`, `created_at`,
-`updated_at`. Cerca: ordenada per creació (més recent primer); per defecte només actives,
+Resposta: `id`, `project_id`, `course_id` *(codi)*, `kind`, `content`, `source`, `status`,
+`created_at`, `updated_at`. Cerca: ordenada per creació (més recent primer); per defecte només actives,
 `include_inactive=true` inclou les oblidades; `query` cerca literalment a `content`.
+
+## Assignatures i grups (D028, codi, no desplegat)
+
+`name`: 1–200 caràcters, no només espais. `code` (fins a 40), `term` (text lliure fins a 60,
+p. ex. «2026-27 T1») i `notes` (fins a 4.000): per defecte buits. `status`: `active` (en
+crear) o `archived`; les assignatures no s'esborren, s'arxiven. Resposta: `id`, `name`,
+`code`, `term`, `notes`, `status`, `created_at`, `updated_at`.
+
+Llistat: per defecte només actives (`status=archived` per veure les arxivades), ordenat per
+nom; `query` cerca literalment a `name` i `code`. Cada assignatura porta `groups` amb els
+seus grups actius, de manera que «qui em fa el seminari de X?» és una sola consulta.
+`overview` retorna `course` (amb grups), fins a 100 tasques obertes i fins a 100 notes
+actives de l'assignatura, amb `truncated`.
+
+`PUT /api/v1/courses/{id}/groups` desa un grup: `kind` (`theory`, `seminar`, `lab` o
+`other`), `label` (fins a 60, p. ex. «S102»; per defecte buit), `teacher` (fins a 200),
+`schedule` (text lliure fins a 300), `location` (fins a 200) i `status` (`active` o
+`inactive`). El grup s'identifica per (assignatura, `kind`, `label`): si ja existeix,
+s'actualitzen només els camps enviats; si no, es crea. Repetir la petició no duplica res,
+per això no porta `Idempotency-Key` (és un `PUT`). Resposta: `id`, `course_id`, `kind`,
+`label`, `teacher`, `schedule`, `location`, `status`, `updated_at`.
+
+## Exportació (D027, codi, no desplegat)
+
+`GET /api/v1/export` retorna tot el que Jarvis guarda del propietari: `exported_at`,
+`truncated` i les llistes `projects`, `tasks`, `notes`, `courses` i `course_groups`,
+**incloent arxivats, cancel·lats i inactius**, en la mateixa forma pública que la resta de
+rutes (sense propietari, claus d'idempotència ni empremtes). Com a màxim 1.000 files per
+taula (perquè la resposta càpiga en una sola petició); si alguna en té més, `truncated: true`
+i per tenir-ho tot cal una còpia (`npm run db:backup`).
 
 ## Resum diari
 
@@ -88,7 +133,8 @@ Resposta: `id`, `project_id`, `kind`, `content`, `source`, `status`, `created_at
 (`Europe/Madrid`), `overdue`, `due_today`, `due_this_week` (tasques obertes que vencen
 els 7 dies següents), `follow_ups` (com a màxim 3 projectes), `is_empty`, `truncated` i
 `text` (missatge en català fet amb plantilles). Cada tasca porta `id`, `title`,
-`due_date`, `priority`, `project_id` i `project_name`; cada seguiment, `project_id`,
+`due_date`, `priority`, `project_id`, `project_name` i, al codi no desplegat, `course_id` i
+`course_name` (al text, un lliurament mostra l'assignatura en lloc del projecte); cada seguiment, `project_id`,
 `project_name`, `reason` (`review_due`, `pending_decision` o `inactive`) i `detail`.
 Regles a [AUTOMATIONS](AUTOMATIONS.md).
 
@@ -108,7 +154,8 @@ resposta porta `truncated: true`; no hi ha paginació, cal afinar els filtres.
 
 ## Idempotència opcional
 
-Aplica a `POST` de projectes, tasques i notes. Sense clau, cada POST crea un registre nou,
+Aplica a `POST` de projectes, tasques, notes i assignatures. Els grups (`PUT`) no la
+necessiten perquè s'identifiquen per la seva clau natural. Sense clau, cada POST crea un registre nou,
 encara que el contingut sigui igual. Amb clau, identificador ASCII `[A-Za-z0-9._:-]`
 d'1–128 caràcters, es garanteix un únic registre per propietari/clau i tipus. Mateix
 contingut retorna el mateix registre (201); contingut diferent retorna 409. Els camps
@@ -135,7 +182,11 @@ servei no disponible. Errors inesperats es redueixen a 503 sense detall intern.
 | `invalid_task`, `invalid_task_filter`, `invalid_task_update` | 422 | Alta, filtres o canvis de tasca invàlids |
 | `invalid_note`, `invalid_note_filter`, `invalid_note_update` | 422 | Alta, filtres o canvis de nota invàlids |
 | `invalid_summary_date` | 422 | `date` del resum invàlida |
+| `invalid_course`, `invalid_course_id` | 422 | Alta o UUID d'assignatura invàlids *(codi)* |
+| `invalid_course_filter`, `invalid_course_update` | 422 | Filtres del llistat o canvis d'assignatura invàlids (o cap canvi) *(codi)* |
+| `invalid_course_group` | 422 | Dades de grup invàlides *(codi)* |
 | `project_not_found` | 404 | Projecte inexistent o d'un altre propietari (també en vincular-hi una tasca o nota) |
+| `course_not_found` | 404 | Assignatura inexistent o d'un altre propietari (també en vincular-hi una tasca, nota o grup) *(codi)* |
 | `task_not_found`, `note_not_found` | 404 | Tasca o nota inexistent o d'un altre propietari |
 | `idempotency_conflict` | 409 | Mateixa clau amb contingut diferent |
 | `telegram_failed` | 502 | Telegram no ha acceptat el missatge |

@@ -85,10 +85,10 @@ export function createSummaryService(repository, clock = Date.now) {
         repository.listTasks(owner, { project_id: null, status: 'open', due_before: addDays(today, 7), limit: FETCH + 1 }),
         repository.listProjects(owner, { status: null, query: null, limit: FETCH + 1 }),
         repository.searchNotes(owner, { query: null, kind: 'open_question', project_id: null, include_inactive: false, limit: FETCH + 1 }),
-        repository.listCourses(owner, { status: 'active', query: null, limit: FETCH }),
+        repository.listCourses(owner, { status: 'active', query: null, limit: FETCH + 1 }),
       ]);
       // Beyond FETCH rows the summary is knowingly partial and says so.
-      const truncated = [tasks, projects, questions].some(rows => rows.length > FETCH);
+      const truncated = [tasks, projects, questions, courses].some(rows => rows.length > FETCH);
       for (const rows of [tasks, projects, questions]) rows.length = Math.min(rows.length, FETCH);
       const names = new Map(projects.map(project => [project.id, project.name]));
       const courseNames = new Map(courses.map(course => [course.id, course.name]));

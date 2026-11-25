@@ -140,7 +140,8 @@ injection*): per a Jarvis és només text, però el model que el llegeix podria 
 no pot impedir-ho del tot. La protecció pràctica és que **les eines d'escriptura i d'enviament
 (`create_task`, `update_*`, `save_note`, `send_daily_summary`…) es mantinguin a «Needs
 approval»** al client: així cap acció surt sense que la vegis. Les de lectura declaren
-`readOnlyHint` i poden anar a «Always allow».
+`readOnlyHint` i poden anar a «Always allow», excepte `export_data`: ho retorna tot de cop,
+no declara l'anotació i s'ha de mantenir amb confirmació.
 
 ### Còpies
 
@@ -185,6 +186,59 @@ personals també cal revisar retenció i controls d’abús. La finestra de
 recuperació gratuïta no substitueix còpies independents. Restauració acotada a projects provada
 localment i sobre Neon en BD separada; no equival a recuperació completa del compte. Guia de configuració a
 [DEVELOPMENT](DEVELOPMENT.md), evidència a [CURRENT_STATE](CURRENT_STATE.md).
+
+## Política de dades personals (D027) — proposada, pendent de confirmació
+
+**Estat:** els mecanismes estan implementats i provats localment, **no desplegats**. Els
+valors (què es pot desar, terminis) són una proposta. **Fins que l'usuari la confirmi,
+Jarvis només ha de contenir dades fictícies.**
+
+**Què s'hi pot desar:** projectes, tasques, notes i dades acadèmiques pròpies.
+
+**Què no s'hi ha de desar mai:** contrasenyes, credencials o codis; dades bancàries;
+dades de salut; dades sensibles d'altres persones. Dels professors, només el que la
+universitat ja publica (nom, grup, horari, aula). Motius: el contingut viatja cap al model
+d'IA que fa de client i, si Telegram està actiu, els títols viatgen cap a Telegram.
+
+**Cicle de vida:**
+
+1. **Actiu.** Es consulta i s'edita des de Claude.
+2. **Descartat.** «Oblida això», cancel·lar una tasca, arxivar un projecte o una
+   assignatura. Deixa de sortir a les consultes normals, però continua a la base de dades,
+   a l'exportació i a les còpies. Es pot recuperar.
+3. **Purgat.** `npm run data:purge` esborra definitivament el que fa més de 30 dies
+   (valor proposat) que es va descartar. L'executa el desenvolupador al seu ordinador, amb el
+   rol migrador; **el Worker i el model no poden esborrar res**. Per defecte l'ordre només
+   mostra què esborraria. Purgar un projecte o una assignatura arxivats n'esborra també les
+   tasques i les notes, excepte les que també pertanyen a una cosa viva (només es desvinculen).
+   Esborrar exigeix `--confirm` i un període explícit (`--days N`).
+
+**Drets pràctics de l'usuari sobre les seves dades:**
+
+| Vull… | Com |
+| --- | --- |
+| Veure tot el que Jarvis sap de mi | Eina `export_data` o `GET /api/v1/export` |
+| Que deixi d'usar una dada | «Oblida-ho» des de Claude (descart, reversible) |
+| Que desaparegui de debò | Descartar-la i després `npm run data:purge -- --days 0 --confirm` |
+| Saber quins clients hi tenen accés | `npm run oauth:connections` |
+| Tallar l'accés d'un client | `npm run oauth:revoke -- <id>` (o `-- --all`) |
+| Tallar-ho tot ara mateix | Canviar `OAUTH_SIGNING_KEY` |
+
+**Còpies de seguretat:** fitxers JSON en clar a `backups/`, privats (permisos 0600) i
+ignorats per Git. Contenen totes les dades, també les que després es purguin. No es netegen
+soles: quan hi hagi dades reals, esborrar a mà les de més de 90 dies (valor proposat) i no
+copiar-les a serveis al núvol.
+
+**On viuen les dades:** Neon (PostgreSQL, Frankfurt, UE), el Worker de Cloudflare les
+processa en trànsit, el client d'IA les rep quan les demana i Telegram en rep els títols del
+resum si s'activa. Cap d'aquests tercers queda cobert per aquesta política: s'hi apliquen
+les seves condicions.
+
+**Riscos que la política no elimina:** el contingut que el model ja ha llegit no es pot
+«desllegir»; l'exportació és una eina de lectura que ho retorna tot, i convé deixar-la amb
+confirmació al client; la purga és irreversible i depèn de mirar-ne la previsualització;
+no hi ha xifrat propi de les dades ni de les còpies; no hi ha registre d'accessos consultable
+(observability desactivada).
 
 ## Requisits futurs abans de producció
 

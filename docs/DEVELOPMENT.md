@@ -111,8 +111,8 @@ La taula `oauth_grants` pot quedar-se: no molesta el codi antic.
 JSON privat que només contingui aquesta clau i puja'l amb `npx wrangler secret bulk
 FITXER_PRIVAT --name jarvis --env-file /dev/null` (`FITXER_PRIVAT` és un marcador).
 Tots els tokens, codis i clients registrats deixen de ser vàlids a l'instant: cal tornar
-a connectar Claude web i Claude Code. Per revocar una sola connexió no hi ha pantalla:
-cal un `UPDATE oauth_grants SET revoked_at = now() ...` amb el rol migrador.
+a connectar Claude web i Claude Code. Per revocar una sola connexió sense SQL, amb el codi
+de D027 hi ha `npm run oauth:revoke` (vegeu [Operacions de dades](#operacions-de-dades)).
 
 ### Provar el login en local (opcional)
 
@@ -123,12 +123,15 @@ demostra que falli en remot. No reutilitzis l'OAuth App de producció.
 
 ## Tasques, notes i resum diari — D024–D026
 
-**Estat (2026-11-25): implementat i provat localment a la branca `feat/jarvis-core`; NO
-desplegat. Tots els passos d'aquesta secció estan PENDENTS.** El Worker públic continua amb
-la versió de D023 (2 eines), la migració 003 **no** s'ha aplicat a Neon i Telegram **no**
-està configurat. Les proves són amb simuladors i PostgreSQL local (vegeu
-[PostgreSQL local](#postgresql-local-per-a-les-proves-dintegració)); Telegram real, el cron
-real i els clients Claude amb les eines noves **no** s'han validat. Evidència a
+**Estat (2026-11-25): migració i desplegament executats.** La migració 003 es va aplicar a
+Neon (pas 3) i el Worker es va publicar el 2026-11-25 (pas 4; versió
+`962035a5-07aa-4cc5-84cf-fc66fb0367f3`, 13 eines, Cron Trigger registrat). Es va comprovar
+amb `db:verify`, amb `dev:verify-neon` (driver HTTP real de Neon) i amb una lectura feta amb
+la connexió OAuth real. **Encara pendents:** el pas 5 (reconnectar Claude web/app i Claude
+Code perquè vegin les 13 eines), el pas 6 (validar-les amb dades fictícies) i tot l'apartat
+de [Telegram](#telegram-opcional), que **no** està configurat; per tant, el cron es desperta
+però no envia res. Els passos es conserven com a referència per tornar-los a fer en un altre
+entorn. Evidència a
 [CURRENT_STATE](CURRENT_STATE.md), decisions a [DECISIONS](DECISIONS.md), contractes a
 [API_CONTRACT](API_CONTRACT.md) i [MCP_CONTRACT](MCP_CONTRACT.md), riscos a
 [SECURITY_PRIVACY](SECURITY_PRIVACY.md).
@@ -143,7 +146,7 @@ Un **Cron Trigger** és un «despertador» de Cloudflare: a les hores indicades 
 `wrangler.jsonc` (`30 5-8 * * *`, en UTC) el Worker s'executa sol, sense cap petició. El
 Worker mateix decideix si a Madrid ja són les 7 i si el resum d'avui ja s'ha gestionat.
 
-### Posada en marxa de D024–D026 (pendent)
+### Posada en marxa de D024–D026 (passos 1–4 executats, 5–6 pendents)
 
 Ordre important: **migració abans del deploy**; el codi nou falla si la BD no té les
 taules noves. Ordres al terminal, a l'arrel del projecte i a la branca `feat/jarvis-core`
@@ -159,8 +162,11 @@ confirma l'usuari.
    npm run build
    ```
 
-   *Resultat:* `npm test` acaba amb 52 proves passades i `build` genera el paquet sense
-   desplegar res. *Si falla:* no continuïs; el problema és al codi local, no a Neon.
+   *Resultat:* `npm test` acaba amb 52 proves passades (el recompte d'aquell moment; ara en
+   són més) i `build` genera el paquet sense desplegar res. *Si falla:* no continuïs; el
+   problema és al codi local, no a Neon. Executa `npm test` **sol** i llegeix-ne el resultat
+   abans de desplegar: vegeu la lliçó a la
+   [posada en marxa de D027–D028](#posada-en-marxa-de-d027d028-pendent).
 2. **Còpia abans de migrar: atenció.** Amb el codi d'aquesta branca, `npm run db:backup`
    exigeix que la BD ja tingui les migracions 001–003. Abans de migrar, Neon només en té
    001–002, així que l'ordre s'atura amb `migration_mismatch` **sense escriure res** (deduït
@@ -296,6 +302,245 @@ seria un projecte amb estat diferent d'`active`, que el codi antic mostra igualm
 provat què fa el Cron Trigger després d'un rollback; per assegurar que no s'envia res,
 esborra també els secrets de Telegram. La migració 003 no es desfà automàticament.
 
+## Política de dades i universitat — D027–D028
+
+**Estat (2026-11-25): implementat i provat localment a la branca
+`feat/data-policy-university`; NO desplegat. Tots els passos d'aquesta secció estan
+PENDENTS i els executa o els confirma l'usuari.** La migració 004 **no** s'ha aplicat a Neon
+i el Worker públic continua amb la versió de D024–D026 (13 eines, sense assignatures ni
+exportació). Les ordres `data:purge`, `oauth:connections` i `oauth:revoke` només s'han provat
+com a funcions sobre PostgreSQL local, mai contra Neon. Evidència a
+[CURRENT_STATE](CURRENT_STATE.md), decisions a [DECISIONS](DECISIONS.md), dades a
+[DATA_MODEL](DATA_MODEL.md), contractes a [API_CONTRACT](API_CONTRACT.md) i
+[MCP_CONTRACT](MCP_CONTRACT.md), riscos a [SECURITY_PRIVACY](SECURITY_PRIVACY.md).
+
+Què afegeix. **D027 (política de dades)** és una **proposta** amb valors per defecte ja
+implementats: a l'aplicació res s'esborra, només es *descarta* (una nota passa a `inactive`,
+una tasca a `cancelled`, un projecte o una assignatura a `archived`). L'esborrat definitiu el
+fa el desenvolupador amb una ordre, mai el Worker ni el model, perquè un error de la IA no
+pugui destruir dades. També permet exportar-ho tot i gestionar les connexions OAuth sense
+SQL. **D028 (universitat)** afegeix assignatures amb els seus grups (teoria, seminari,
+laboratori) i tracta lliuraments i exàmens com a tasques amb `course_id`. Passa de 13 a 19
+eines MCP. Fins que l'usuari confirmi la política, **només dades fictícies**.
+
+### Posada en marxa de D027–D028 (pendent)
+
+Ordre important: **migració abans de la còpia i del deploy**. La còpia exigeix que la BD
+tingui totes les migracions del codi, i el codi nou falla si la BD no té les taules noves.
+Migrar primer és segur per al Worker actual: el codi publicat ignora les taules i la
+columna noves. Ordres al terminal, a l'arrel del projecte i a la branca
+`feat/data-policy-university` (el deploy publica la carpeta tal com està; fusionar a main
+requereix aprovació apart). Cap pas imprimeix secrets.
+
+**Lliçó del desplegament anterior.** El deploy de D024–D026 es va llançar en una sola ordre
+encadenada darrere de les proves, i la sortida de `npm test` passava per un `grep`. Una prova
+va fallar, però l'ordre encadenada va veure el resultat del `grep` (que sí havia trobat
+text) i no el de `npm test`, i va desplegar igualment. Regla: **executa `npm test` sol,
+llegeix el resultat i, només si no hi ha cap fallada, llança el deploy com a ordre a part.**
+Mai `npm test | grep ... && npx wrangler deploy ...`.
+
+1. **Migrar i verificar la BD** (terminal):
+
+   ```sh
+   npm run db:migrate
+   npm run db:verify
+   ```
+
+   `db:migrate` aplica `004_courses.sql` (taules `courses` i `course_groups`, i la columna
+   opcional `course_id` a `tasks` i `notes`) i dona al rol runtime els permisos per columnes
+   de les taules noves (sense `DELETE` ni canvi de propietari). Les migracions 001–003 ja
+   aplicades es comproven pel checksum i no es repeteixen.
+   *Resultat:* `Migrations 001-004 and runtime table grants verified.` i després
+   `Runtime connection and minimum permissions verified.`
+   *Si falla:* `migration_mismatch` vol dir que un checksum no coincideix i s'atura **sense
+   canviar res**; no editis cap migració per fer-la passar. `privileges_too_broad` vol dir
+   que el rol runtime no té exactament els permisos esperats: no despleguis.
+2. **Còpia format 3** (terminal):
+
+   ```sh
+   npm run db:backup
+   ```
+
+   Desa projectes, assignatures, grups, tasques i notes en un fitxer **nou**
+   `backups/jarvis-<data>.json` (privat, ignorat per Git, mai sobreescriu).
+   *Resultat:* `Logical snapshot of projects, courses, tasks and notes saved privately to ...`
+   *Si falla:* `migration_mismatch` vol dir que la BD no té totes les migracions 001–004:
+   torna al pas 1.
+3. **Proves i, després, deploy en una ordre a part** (terminal). Primer, només les proves:
+
+   ```sh
+   npm test
+   ```
+
+   *Resultat:* al final, el resum de Node mostra `pass 55` i `fail 0`. **Llegeix-lo.**
+   *Si falla:* si `fail` no és 0, no despleguis; el problema és al codi local.
+
+   Només si `fail` és 0, en una ordre nova:
+
+   ```sh
+   npx wrangler whoami
+   npx wrangler deploy --env-file /dev/null --message 'D027-D028 data policy and university'
+   ```
+
+   A Windows, posa un fitxer buit local en lloc de `/dev/null`.
+   *Resultat:* Wrangler mostra l'URL, un ID de versió nou i el cron `30 5-8 * * *`.
+   *Si falla:* després del deploy, un 503 `service_unavailable` a les eines d'assignatures
+   sol voler dir que la migració 004 no s'ha aplicat: fes el pas 1 o desfés el deploy.
+4. **Reconnectar els clients Claude** (navegador i terminal). A Claude web/app, Customize →
+   Connectors → Jarvis: desconnectar i tornar a connectar. A Claude Code, `/mcp` → `jarvis`
+   → reconnectar. Recomanació de permisos: `list_courses` i `get_course_overview` poden anar a
+   «Always allow»; `create_course`, `update_course` i `save_course_group` a **«Needs
+   approval»**. `export_data` és de lectura, però bolca totes les teves dades a la conversa:
+   és raonable deixar-la també a «Needs approval».
+   *Resultat:* Jarvis mostra 19 eines.
+   *Si falla:* si encara en veus 13, el client conserva la llista antiga: cal reconnectar.
+5. **Validar amb dades fictícies** (xat de Claude). Per exemple: «crea l'assignatura fictícia
+   Sistemes Operatius», «el seminari S102 el fa la professora Prova, dimarts de 10 a 12»,
+   «qui em fa el seminari de Sistemes Operatius?», «afegeix la pràctica de SO per al dia 20»
+   i «què tinc avui?». Després, en una conversa nova, «exporta les meves dades de Jarvis».
+   *Resultat:* les eines responen sense `isError`, el grup no es duplica si el tornes a
+   desar i l'exportació inclou l'assignatura. Registra el resultat real a
+   [CURRENT_STATE](CURRENT_STATE.md).
+   *Si falla:* `course_not_found` (404) vol dir que l'id de l'assignatura no existeix o no
+   és teu; un error 422 `invalid_course...` indica un camp massa llarg o un valor no permès.
+6. **Confirmar la política de dades** (lectura i decisió de l'usuari). Revisa D027 a
+   [DECISIONS](DECISIONS.md): què es guarda, 30 dies abans de poder purgar i 90 dies com a
+   màxim per a les còpies. Confirma-la o demana canvis **abans** de posar-hi dades reals.
+   *Resultat:* D027 passa de proposada a aprovada a [DECISIONS](DECISIONS.md).
+
+**Desfer:** `npx wrangler rollback` (terminal) torna a la versió de D024–D026. Les taules i
+la columna noves poden quedar-se: el codi anterior les ignora. La migració 004 no es desfà
+automàticament.
+
+### Operacions de dades
+
+Aquestes ordres són el petit «manual de manteniment» de D027. **Atenció: actuen sobre la BD
+real de Neon (`jarvis_dev`) amb el rol migrador** (les credencials de `.env.database`), no
+sobre una còpia. Totes s'executen al terminal, a l'arrel del projecte. `data:purge` necessita
+la migració 004 aplicada (pas 1 de dalt).
+
+**Per què el `--`.** Quan escrius `npm run data:purge -- --days 0`, tot el que va després
+del `--` passa al script; sense el `--`, npm es pot quedar els flags per a ell i el script no
+els veu. Comprova sempre la primera línia de la sortida per saber què ha passat de debò.
+
+#### Esborrar definitivament el descartat: `npm run data:purge`
+
+Esborra per sempre el que ja estava descartat fa més de N dies (per defecte 30). Els dies es
+compten des de `updated_at`, la darrera modificació, que normalment és el moment del descart.
+Esborra exactament això:
+
+- notes `inactive` (les que has demanat «oblidar»);
+- tasques `cancelled` (les `done` es conserven com a historial);
+- grups d'assignatura `inactive`;
+- projectes `archived`, **amb totes les seves tasques i notes** (també les fetes);
+- assignatures `archived`, **amb els seus grups, tasques i notes**;
+- estat operatiu: connexions OAuth revocades, caducades o mai completades, i registres
+  antics de `summary_runs` (el registre del resum diari).
+
+**Excepció que protegeix dades vives:** si una tasca o nota és alhora d'un projecte arxivat i
+d'una assignatura activa (o al revés), no s'esborra: només se li treu l'enllaç amb el que
+desapareix. La sortida ho compta a part, a la línia `Kept because… (only unlinked)`.
+
+**No toca els fitxers de `backups/`**: el que s'esborra pot continuar en còpies antigues.
+
+**Per defecte només previsualitza.** Fa totes les esborrades dins d'una transacció i, al
+final, la desfà (ROLLBACK). Així el recompte que veus és exacte, no una estimació, i la BD
+queda igual. Només esborra de veritat amb `--confirm`. Opcions: `--days N` (enter de 0 a
+3650; `--days 0` vol dir «tot el que ja està descartat, sense esperar») i `--confirm`.
+**`--confirm` exigeix escriure `--days N`**: sense període explícit no s'esborra res. Qualsevol
+altre argument (`--day 90`, `--days=90`, un valor buit) atura l'ordre amb
+`invalid_purge_arguments` en lloc d'esborrar amb un valor per defecte.
+
+```sh
+npm run data:purge                           # previsualitza amb 30 dies
+npm run data:purge -- --days 0               # previsualitza tot el descartat
+npm run data:purge -- --days 0 --confirm     # esborra; irreversible
+```
+
+*Resultat de la previsualització:* `PREVIEW, nothing erased. Would erase (discarded more
+than 30 days ago):`, una línia per taula (`notes: 1`, `tasks: 0`...) i `Repeat with
+--confirm to erase. Backup files are not touched.` Amb `--confirm`, la primera línia és
+`Permanently erased (discarded more than ... days ago):`.
+*Si falla:* `invalid_days` vol dir que el número de dies no és vàlid. Davant de qualsevol
+error la transacció es desfà i no s'esborra res.
+
+**`--confirm` és irreversible.** L'única manera de recuperar-ho és restaurar una còpia
+anterior (`db:restore`, que només restaura a `jarvis_restore`).
+
+Exemple complet, oblidar una nota:
+
+1. Al xat, «oblida la nota fictícia sobre l'horari de tutories». Jarvis la marca `inactive`:
+   deixa de sortir a les cerques, però continua a la BD.
+2. Si vols que desaparegui ja, sense esperar 30 dies, previsualitza (terminal):
+   `npm run data:purge -- --days 0`. Comprova que surt `notes: 1` i que la resta de
+   recomptes són els que esperes: amb `--days 0` també entra **tot** el que hagis descartat.
+3. Si quadra, esborra: `npm run data:purge -- --days 0 --confirm`. *Resultat:*
+   `Permanently erased ...` amb `notes: 1`.
+4. Si la nota era a còpies antigues de `backups/`, continua allà: esborra aquells fitxers a
+   mà si cal que desaparegui del tot.
+
+#### Connexions OAuth: `oauth:connections` i `oauth:revoke`
+
+Cada cop que un client (Claude web/app, Claude Code) inicia sessió es crea una
+**connexió**. Aquestes ordres permeten veure-les i tallar-les sense escriure SQL.
+
+```sh
+npm run oauth:connections
+```
+
+*Resultat:* una línia per connexió amb l'id, l'estat (`active`, `expired`, `revoked` o
+`never_completed`, un login que no es va acabar), el host del client (on Jarvis el retorna
+després del login), la data de creació i l'última renovació. No mostra cap hash ni token.
+Si no n'hi ha cap: `No client connections.`
+
+```sh
+npm run oauth:revoke -- ID_DE_LA_CONNEXIO
+npm run oauth:revoke -- --all
+```
+
+`ID_DE_LA_CONNEXIO` és un marcador: copia l'id de la llista anterior.
+*Resultat:* `Connections revoked: 1. Those clients must log in again.` El client perd
+l'accés de seguida (també el token d'accés vigent) i ha de tornar a iniciar sessió.
+*Si falla:* `invalid_connection_id` vol dir que l'id no té format d'UUID; `revoked: 0` vol
+dir que aquella connexió ja estava revocada o no existeix.
+
+Quan fer servir cada cosa:
+
+- **Revocar una** (`-- ID`): un dispositiu perdut o una connexió vella que ja no uses.
+- **Revocar totes** (`-- --all`): vols desconnectar tots els clients però no sospites que
+  la clau de signatura s'hagi filtrat.
+- **Canviar `OAUTH_SIGNING_KEY`** (vegeu [revocació d'emergència](#desfer-i-revocació-demergència)):
+  continua sent l'interruptor d'emergència si sospites una fuita. A més de les connexions,
+  invalida els registres de client i els fluxos de login a mig fer, que no són a la BD.
+
+#### Exportar les teves dades
+
+Amb el Worker de D027 desplegat, hi ha dues maneres d'obtenir tot el que Jarvis guarda de tu:
+
+- Demanar a Claude «exporta totes les meves dades de Jarvis» (eina `export_data`).
+- Fer `GET /api/v1/export` amb un token vàlid, des del terminal. `JARVIS_TOKEN` és un
+  marcador; no enganxis mai el token al xat:
+
+  ```sh
+  curl -H "Authorization: Bearer JARVIS_TOKEN" \
+    https://jarvis.jarvis-joancardonall.workers.dev/api/v1/export > export.json
+  ```
+
+*Resultat:* un JSON amb `exported_at`, `truncated` i les llistes `projects`, `tasks`,
+`notes`, `courses` i `course_groups`, **incloent el que està arxivat, cancel·lat o
+inactiu**. No porta `owner_id`, claus d'idempotència ni empremtes. Màxim 1.000 files per
+taula: si `truncated` és `true`, alguna taula en tenia més i cal una còpia (`db:backup`)
+per tenir-ho tot. El fitxer conté dades personals: guarda'l en un lloc privat i fora del
+repositori.
+
+#### Còpies: format 3
+
+`npm run db:backup` ara escriu el **format 3**, que afegeix assignatures i grups (detall a
+[Còpia i restauració independent](#4-còpia-i-restauració-independent)). **Els fitxers de
+format 2 es poden continuar restaurant**: el que es va afegir després pren el valor per
+defecte (per exemple, `course_id` buit). Les còpies **no es purguen soles**. Recomanació, quan
+hi hagi dades reals: esborrar a mà els fitxers de `backups/` de més de 90 dies.
+
 ## Publicació de desenvolupament — D021, 2026-11-11
 
 La prohibició de publicar dels procediments històrics següents queda substituïda
@@ -422,16 +667,18 @@ npm run test:worker
 npm run build
 ```
 
-`npm test` (52 proves el 2026-11-25): contracte HTTP/MCP amb storage simulat i
-serialització del driver Neon amb HTTP simulat. Inclou `tests/oauth.test.js`: flux OAuth
+`npm test` (55 proves el 2026-11-25, amb el codi de D027–D028: 18 d'API/MCP, 14 d'OAuth, 14
+de domini i 9 operatives): contracte HTTP/MCP amb storage simulat i serialització del driver
+Neon amb HTTP simulat. Inclou `tests/oauth.test.js`: flux OAuth
 complet amb el client oficial del SDK MCP i GitHub **simulat** (PKCE, redireccions,
 consentiment, rotació de tokens, falsificacions); `tests/domain.test.js`: projectes,
-tasques, notes, resum diari, dates de Madrid i Telegram **simulat** (D024–D026), amb els
+tasques, notes, resum diari, dates de Madrid, Telegram **simulat** (D024–D026), assignatures,
+grups i exportació (D027–D028), amb els
 escenaris compartits `tests/domain-storage.js` i `tests/grant-storage.js` sobre el
 simulador en memòria; i `tests/ops-unit.test.js`, les regles dels scripts operatius.
 No requereix BD, LLM, GitHub, Telegram ni credencials reals.
 `test:worker`: Wrangler/workerd local, ports 18787 i l'inspector de Wrangler;
-comprova salut, autenticació, descoberta MCP (13 eines), metadades OAuth, registre i
+comprova salut, autenticació, descoberta MCP (19 eines), metadades OAuth, registre i
 pantalla de consentiment per xarxa loopback, sense Neon ni GitHub.
 `build`: només empaquetament `wrangler deploy --dry-run`, no desplega.
 `oauth:setup`: crea `.env.oauth.json` privat per al pas 2 de la
@@ -440,6 +687,9 @@ pantalla de consentiment per xarxa loopback, sense Neon ni GitHub.
 `TELEGRAM_BOT_TOKEN` i `TELEGRAM_CHAT_ID` buits; no sobreescriu mai. `telegram:chat`:
 amb el token ja enganxat, pregunta a Telegram quin xat privat ha escrit al bot i en desa
 l'id; no imprimeix el token. Passos a [Telegram (opcional)](#telegram-opcional).
+`data:purge`, `oauth:connections` i `oauth:revoke` (D027): purga del descartat (per defecte
+només previsualitza), llistat i revocació de connexions OAuth, sobre la BD real amb el rol
+migrador. Manual a [Operacions de dades](#operacions-de-dades).
 
 `npm run dev` escolta només a 127.0.0.1:8787. Sense configuració, `/health`
 funciona i les rutes privades fallen tancades. No hi ha fallback en memòria.
@@ -483,14 +733,17 @@ compartit `tests/grant-storage.js`: codis d'un sol ús, rotació de refresh toke
 restriccions. Una tercera aplica la migració 003 sobre projectes ja existents (que es
 conserven) i executa l'escenari compartit `tests/domain-storage.js`: projectes, tasques,
 notes, registre del resum diari, restriccions, aïllament per propietari i 10 creacions i
-10 reclamacions concurrents. Tots dos escenaris corren també a `npm test` contra el
+10 reclamacions concurrents; amb D028 aplica també la migració 004 i hi afegeix assignatures,
+grups, exportació, claus foranes entre propietaris i 10 desats simultanis del mateix grup, que
+han de deixar una sola fila. Tots dos escenaris corren també a `npm test` contra el
 simulador en memòria, perquè **simulador i SQL real no divergeixin**: si el simulador
 accepta una cosa que PostgreSQL rebutja, la mateixa prova falla en un dels dos costats.
 
 **Executades per primer cop el 2026-11-25** (PostgreSQL 17.12 local): `test:postgres` 3/3,
 també sobre el codi de D023. Això tanca el pendent de D023, quan no hi havia PostgreSQL
 local i el SQL de `oauth_grants` només s'havia provat sobre Neon amb ROLLBACK.
-Evidència a [CURRENT_STATE](CURRENT_STATE.md). No prova el driver HTTP de Neon.
+Repetides el 2026-11-25 amb el codi de D027–D028: 3/3. Evidència a
+[CURRENT_STATE](CURRENT_STATE.md). No prova el driver HTTP de Neon.
 
 ### PostgreSQL local per a les proves d'integració
 
@@ -642,17 +895,20 @@ npm run dev:verify-neon
   CREATEROLE, BYPASSRLS o membresies. Configura permisos separats per BD i schema.
   Desa primer les credencials a `.env.database`, amb mode Unix 0600, per conservar
   capacitat de recuperació si una operació remota falla parcialment.
-- `db:migrate`: aplica les SQL revisades 001, 002 (`oauth_grants`, D023) i 003 (`tasks`,
-  `notes`, `summary_runs` i camps nous de `projects`, D024–D026) i registra cada checksum
+- `db:migrate`: aplica les SQL revisades 001, 002 (`oauth_grants`, D023), 003 (`tasks`,
+  `notes`, `summary_runs` i camps nous de `projects`, D024–D026) i 004 (`courses`,
+  `course_groups` i `course_id` a tasques i notes, D028) i registra cada checksum
   a `jarvis_migrations` en transacció. Repetir-la és segur només si els checksums
   coincideixen. Concedeix al runtime permisos **per columnes**: `SELECT` i `INSERT`, i
-  `UPDATE` només dels camps editables (p. ex. `title`, `status`, `due_date` a `tasks`).
+  `UPDATE` només dels camps editables (p. ex. `title`, `status`, `due_date` a `tasks`; d'un
+  grup, mai `kind`, `label` ni `course_id`).
   Mai DELETE ni `UPDATE` de `owner_id`, `id`, `created_at` o `request_hash`; a
   `oauth_grants`, `SELECT, INSERT, UPDATE`. Si hi ha esquema antic sense ledger, s'atura.
 - `db:verify`: prova TLS, connexió i privilegis mínims del runtime: sense superusuari ni
-  membresies; pot llegir i inserir a `projects`, `tasks`, `notes`, `summary_runs` i
-  `oauth_grants` i editar-ne els camps permesos; no pot esborrar files, canviar el
-  propietari de projectes, tasques o notes ni crear objectes al schema.
+  membresies; pot llegir i inserir a `projects`, `tasks`, `notes`, `courses`,
+  `course_groups`, `summary_runs` i `oauth_grants` i editar-ne els camps permesos; no pot
+  esborrar files, canviar el propietari de projectes, tasques, notes o assignatures ni crear
+  objectes al schema.
 - `token`: genera un token nou i el desa a `.env.client`; `.dev.vars` conté només
   hash, caducitat, owner i URL runtime. **Ja no imprimeix secrets.** Cap fitxer existent
   se sobreescriu; una rotació requereix decisió local explícita sobre els fitxers.
@@ -674,27 +930,37 @@ npm run db:backup
 npm run db:restore
 ```
 
-**Format 2 (D026).** Cada `db:backup` desa un fitxer **nou** amb data,
+**Format 3 (D027).** Cada `db:backup` desa un fitxer **nou** amb data,
 `backups/jarvis-<data>.json` (directori ignorat, fitxer Unix 0600); mai sobreescriu una
-còpia anterior. Llegeix `projects`, `tasks` i `notes` sota transacció REPEATABLE READ READ
-ONLY i conserva IDs, propietari, dates, estat i idempotència. Inclou format i checksums de
-les migracions 001–003; es valida l'estructura de cada fila i el SHA-256. Si la BD no té
-exactament 001–003, s'atura amb `migration_mismatch`. Màxims: 10.000 projectes i 50.000
-tasques i notes; només dades fictícies. L'antic `backups/projects.json` (format 1) ja no es
-pot restaurar amb aquest codi.
+còpia anterior. Llegeix `projects`, `courses`, `course_groups`, `tasks` i `notes` sota
+transacció REPEATABLE READ READ ONLY i conserva IDs, propietari, dates, estat i
+idempotència. Inclou format i checksums de les migracions 001–004; es valida l'estructura de
+cada fila i el SHA-256. Si la BD no té exactament les migracions del codi (001–004), s'atura
+amb `migration_mismatch`: no es pot fer la còpia amb el codi nou abans de migrar. Màxims:
+10.000 projectes, 1.000 assignatures, 10.000 grups i 50.000 tasques i notes; només dades
+fictícies fins que es confirmi D027.
+
+**Els fitxers de format 2 (D026) es poden restaurar:** el que es va afegir després pren el
+valor per defecte, com ho fan les migracions amb les files existents. Requisit: que les
+migracions amb què es va fer la còpia existeixin al codi sense canvis. L'antic
+`backups/projects.json` (format 1) ja no es pot restaurar amb aquest codi.
 
 `db:restore` restaura la còpia **més recent** (per nom amb data). Només admet
 `jarvis_restore`, al mateix endpoint, amb el rol migrador i sense taules existents.
-Reconstrueix tot l'esquema (001–003), insereix les files atòmicament i compara el
-snapshot resultant complet. Mai esborra el destí ni toca la BD d'origen.
+Reconstrueix tot l'esquema (001–004) i insereix les files en **una sola transacció**: si
+alguna cosa falla, la BD destí queda buida, no a mitges. Després compara fila per fila el
+resultat amb el fitxer (no el checksum del fitxer, perquè una còpia de format 2 es llegeix
+com a format 3).
+*Resultat:* `Restore into empty jarvis_restore verified against snapshot checksum.` Mai esborra el destí ni toca la BD d'origen.
 Fitxer preexistent o destí ocupat: falla tancat, no sobreescriu. No és pg_dump
 complet: exclou rols, configuració, altres taules i recuperació del compte.
 Checksum detecta corrupció, no autentica còpies externes desconegudes.
 La còpia no inclou `oauth_grants` ni `summary_runs` (estat operatiu, no dades de
 l'usuari): després de restaurar cal tornar a connectar els clients OAuth.
 
-Aquesta és una prova acotada de restauració; no una política operativa per dades
-personals. La còpia és local i no té xifrat propi ni retenció automatitzada.
+Aquesta és una prova acotada de restauració. La política proposada a D027 hi afegeix només
+una recomanació: no conservar còpies de més de 90 dies quan hi hagi dades reals, esborrant-les
+a mà. La còpia és local, en clar, sense xifrat propi ni retenció automatitzada.
 No activar backups comercials ni emmagatzematge de pagament.
 
 ### 5. Prova del Worker local contra Neon
@@ -718,18 +984,21 @@ més recent que el Node de les proves locals inicials. No s'ha validat manualmen
 
 ## Proves de les operacions
 
-`npm test` inclou límits de destí, TLS, corrupció de còpies format 2, fitxers privats
+`npm test` inclou límits de destí, TLS, corrupció de còpies (formats 2 i 3), fitxers privats
 sense overwrite (també `.env.oauth.json` i `.env.telegram.json`) i la detecció de les
-migracions 002 i 003. `npm run test:ops` requereix un **clúster local descartable nou**, amb
+migracions 002, 003 i 004. `npm run test:ops` requereix un **clúster local descartable nou**, amb
 `jarvis_dev` i `jarvis_restore` buides, `OPS_TEST_ADMIN_URL` loopback i
 `OPS_TEST_ISOLATED_CLUSTER=true`. Crea rols amb noms fixos en aquest clúster;
 no donar-hi mai un servidor personal ni la configuració Neon de desenvolupament.
 No elimina dades o rols al final: descartar/aturar el clúster de proves expressament.
 
-La suite prova migracions 001–003 repetibles amb ledger, **tot l'escenari de domini
-executat amb el rol runtime**, permisos negatius (DELETE, canvi de propietari, DDL),
-persistència, restauració completa, reobertura d'una connexió i replay d'idempotència
-restaurat. **Executada per primer cop el 2026-11-25: 1/1** amb el
+La suite prova migracions 001–004 repetibles amb ledger, **tot l'escenari de domini
+executat amb el rol runtime** (també assignatures i grups), permisos negatius (DELETE, canvi
+de propietari, DDL, camps fixos d'un grup), persistència, còpia format 3, restauració
+completa i atòmica (una fila corrupta deixa la BD buida), reobertura d'una connexió, replay
+d'idempotència restaurat, llistat i revocació de connexions OAuth i purga amb
+previsualització i confirmació. **Executada per primer cop el 2026-11-25: 1/1**, i repetida
+el mateix dia amb el codi de D027–D028: 1/1, amb el
 [clúster local](#postgresql-local-per-a-les-proves-dintegració). Són proves PostgreSQL
 reals però no acrediten per si soles accés al servei Neon.
 

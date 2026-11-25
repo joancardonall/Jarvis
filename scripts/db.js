@@ -2,8 +2,8 @@ import { readFile, mkdir, readdir } from 'node:fs/promises';
 import { parseEnv } from 'node:util';
 import { Client } from 'pg';
 import { databaseUrl, runSafely, writePrivate } from './ops-config.js';
-import { migrate, grantRuntime, snapshotData, restoreData, snapshotRows, purgeDiscarded, listConnections,
-  revokeConnections } from './database-ops.js';
+import { migrate, grantRuntime, snapshotData, restoreData, snapshotRows, purgeDiscarded, purgeArguments,
+  listConnections, revokeConnections } from './database-ops.js';
 
 await runSafely(async () => {
   const config = parseEnv(await readFile('.env.database', 'utf8'));
@@ -44,12 +44,13 @@ await runSafely(async () => {
       console.log('Restore into empty jarvis_restore verified against snapshot checksum.');
     } else if (command === 'purge') {
       // npm run data:purge -- --days 30 [--confirm]. Without --confirm nothing is erased.
-      const flag = process.argv.indexOf('--days');
-      const days = flag === -1 ? 30 : Number(process.argv[flag + 1]);
-      const outcome = await purgeDiscarded(client, { days, confirm: process.argv.includes('--confirm') });
+      // Arguments are parsed strictly: a typo stops the command instead of erasing with a default.
+      const { days, confirm } = purgeArguments(process.argv.slice(3));
+      const outcome = await purgeDiscarded(client, { days, confirm });
       console.log(outcome.confirmed ? `Permanently erased (discarded more than ${days} days ago):`
         : `PREVIEW, nothing erased. Would erase (discarded more than ${days} days ago):`);
       for (const [table, rows] of Object.entries(outcome.erased)) console.log(`  ${table}: ${rows}`);
+      console.log(`Kept because they also belong to something live (only unlinked): tasks ${outcome.unlinked.tasks}, notes ${outcome.unlinked.notes}`);
       if (!outcome.confirmed) console.log('Repeat with --confirm to erase. Backup files are not touched.');
     } else if (command === 'connections') {
       const connections = await listConnections(client);

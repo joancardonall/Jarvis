@@ -292,3 +292,66 @@ Preguntes de comprensió:
 3. Quina protecció afegeix la clau forana composta si el codi ja filtra per propietari?
 
 Cap concepte es marca com a après sense confirmació de l'usuari.
+
+## 2026-11-25 — Política de dades i universitat (D027–D028)
+
+Què s'ha fet i per què: abans de posar dades reals a Jarvis calia una **política de dades**
+(què es guarda, com s'esborra, com s'exporta) i eines per complir-la. L'usuari ha demanat
+continuar amb aquest bloc i el d'universitat. D027 és una **proposta** amb valors per defecte
+ja implementats: a l'app res s'esborra, només es descarta; l'esborrat definitiu és una ordre
+del desenvolupador (`npm run data:purge`); hi ha exportació completa (`export_data`), gestió de
+connexions OAuth sense SQL i una còpia format 3. D028 afegeix assignatures i grups; de 13 a 19
+eines MCP, amb la migració 004 i cap dependència ni servei nou. Procediment a
+[DEVELOPMENT](../DEVELOPMENT.md), evidència a [CURRENT_STATE](../CURRENT_STATE.md), decisions
+a [DECISIONS](../DECISIONS.md).
+
+Conceptes clau, amb un exemple de Jarvis:
+
+- **Esborrat suau vs esborrat real, i per què el rol de l'app mai esborra.** Esborrat suau
+  vol dir marcar (nota `inactive`); esborrat real vol dir `DELETE`. El Worker treballa amb el
+  rol runtime, que no té permís de `DELETE`. Si Claude entén malament «oblida-ho tot», el
+  pitjor que pot passar és que tot quedi inactiu, recuperable. Esborrar de veritat només ho
+  pot fer el desenvolupador, conscientment, amb `data:purge` i el rol migrador.
+- **Previsualització per rollback.** En lloc de calcular a part «quantes files s'esborrarien»
+  (i arriscar-se a equivocar-se), `data:purge` fa els `DELETE` de veritat dins d'una
+  transacció, compta les files i la desfà amb `ROLLBACK`. El recompte de la previsualització
+  és exactament el que passaria; només amb `--confirm` es fa `COMMIT`.
+- **Upsert sobre una clau natural.** Un *upsert* és «insereix o, si ja existeix, actualitza».
+  Una clau natural és una combinació de camps que ja identifica una cosa al món real. Un grup
+  s'identifica per (assignatura, tipus, etiqueta): tornar a desar «seminari S102 de SO» amb un
+  altre professor actualitza la fila en lloc de crear-ne una segona. Per això no li cal clau
+  d'idempotència: 10 desats simultanis deixen una sola fila.
+- **Reutilitzar una taula existent en lloc de crear-ne una.** Un lliurament o un examen té
+  títol, data límit i estat: és una tasca. En comptes d'una taula `deliverables`, les tasques
+  guanyen un `course_id` opcional. Així «pràctica de SO per al dia 20» surt sola al resum
+  diari, sense codi nou de resum.
+- **Portabilitat de dades (exportació).** Tens dret a endur-te les teves dades. `export_data`
+  retorna tot el que Jarvis guarda de tu, **també** l'arxivat i el cancel·lat, en la mateixa
+  forma pública que la resta d'eines (sense `owner_id` ni empremtes internes).
+- **Còpies compatibles cap endavant.** El codi nou escriu el format 3 però continua llegint
+  el format 2: el que no hi era (assignatures, `course_id`) pren el valor per defecte. Una
+  còpia d'ahir no queda inservible perquè avui hagi crescut l'esquema.
+- **Lliçó del desplegament: no encadenar el deploy darrere d'unes proves filtrades.** En el
+  desplegament de D024–D026 les proves i el deploy anaven en una sola ordre i la sortida de
+  `npm test` passava per `grep`. En una canonada (`|`), l'estat de sortida que compta és el de
+  l'última ordre: el `grep` va acabar bé, el fracàs de la prova es va perdre i el `&&` va
+  desplegar igualment. Regla: `npm test` sol, llegir el resultat i el deploy en una ordre
+  a part.
+
+Verificat realment (2026-11-25, Node 26.13.1, PostgreSQL 17.12 local i descartable):
+`npm test` 55/55 (després de les correccions de la revisió); `test:postgres` 3/3 (migració 004, assignatures,
+exportació, claus foranes entre propietaris, 10 desats simultanis d'un grup → 1 fila);
+`test:ops` 1/1 (migracions 001–004, permisos negatius nous, còpia format 3, restauració
+atòmica, connexions i purga amb previsualització i confirmació); `test:worker` 1/1 (19
+eines); `check` i `build`. **No verificat:** res d'això sobre Neon ni desplegat; la migració
+004 no s'ha aplicat; `dev:verify-neon` ampliat no executat; `data:purge`, `oauth:connections`
+i `oauth:revoke` només provades com a funcions sobre PostgreSQL local, no com a ordres contra
+Neon; clients Claude reals amb les 19 eines. Limitacions: sense horari estructurat ni notes
+d'avaluació, sense Calendar, les còpies no es purguen soles i la política espera confirmació.
+
+Preguntes de comprensió:
+1. Per què el Worker no pot esborrar res encara que Claude li ho demani?
+2. Què guanyem fent els `DELETE` reals i desfent-los, en lloc de comptar les files a part?
+3. Per què `npm test | grep pass && npx wrangler deploy` pot desplegar amb una prova fallada?
+
+Cap concepte es marca com a après sense confirmació de l'usuari.
