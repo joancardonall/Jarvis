@@ -121,6 +121,181 @@ i les tres variables a `.dev.vars` (format a `.dev.vars.example`). Després `npm
 La galeta `Secure` sobre `http://127.0.0.1` depèn del navegador: si falla aquí, no
 demostra que falli en remot. No reutilitzis l'OAuth App de producció.
 
+## Tasques, notes i resum diari — D024–D026
+
+**Estat (2026-11-25): implementat i provat localment a la branca `feat/jarvis-core`; NO
+desplegat. Tots els passos d'aquesta secció estan PENDENTS.** El Worker públic continua amb
+la versió de D023 (2 eines), la migració 003 **no** s'ha aplicat a Neon i Telegram **no**
+està configurat. Les proves són amb simuladors i PostgreSQL local (vegeu
+[PostgreSQL local](#postgresql-local-per-a-les-proves-dintegració)); Telegram real, el cron
+real i els clients Claude amb les eines noves **no** s'han validat. Evidència a
+[CURRENT_STATE](CURRENT_STATE.md), decisions a [DECISIONS](DECISIONS.md), contractes a
+[API_CONTRACT](API_CONTRACT.md) i [MCP_CONTRACT](MCP_CONTRACT.md), riscos a
+[SECURITY_PRIVACY](SECURITY_PRIVACY.md).
+
+Què afegeix: projectes amb estat, prioritat i dates de revisió; **tasques**; **notes**
+(memòria explícita: decisions, preguntes obertes, fets, preferències); un resum de projecte;
+un **resum diari** fet amb regles (sense IA); i, opcionalment, l'enviament d'aquest resum per
+**Telegram** cada matí. Passa de 2 a 13 eines MCP. Només dades fictícies fins que hi hagi una
+política de dades personals.
+
+Un **Cron Trigger** és un «despertador» de Cloudflare: a les hores indicades a
+`wrangler.jsonc` (`30 5-8 * * *`, en UTC) el Worker s'executa sol, sense cap petició. El
+Worker mateix decideix si a Madrid ja són les 7 i si el resum d'avui ja s'ha gestionat.
+
+### Posada en marxa de D024–D026 (pendent)
+
+Ordre important: **migració abans del deploy**; el codi nou falla si la BD no té les
+taules noves. Ordres al terminal, a l'arrel del projecte i a la branca `feat/jarvis-core`
+(el deploy publica el codi de la carpeta tal com està; fusionar a main requereix aprovació
+apart). Cap pas imprimeix secrets. Publicar, migrar i pujar secrets els executa o els
+confirma l'usuari.
+
+1. **Comprovar el codi en local** (terminal):
+
+   ```sh
+   npm ci
+   npm test
+   npm run build
+   ```
+
+   *Resultat:* `npm test` acaba amb 52 proves passades i `build` genera el paquet sense
+   desplegar res. *Si falla:* no continuïs; el problema és al codi local, no a Neon.
+2. **Còpia abans de migrar: atenció.** Amb el codi d'aquesta branca, `npm run db:backup`
+   exigeix que la BD ja tingui les migracions 001–003. Abans de migrar, Neon només en té
+   001–002, així que l'ordre s'atura amb `migration_mismatch` **sense escriure res** (deduït
+   del codi, no executat contra Neon). Opcions, de més a menys senzilla:
+   - Confiar en l'historial de recuperació de Neon per a aquest pas i fer la còpia format 2
+     just després de migrar (pas 3b). Amb només dades fictícies, és la recomanació.
+   - Fer la còpia amb el codi de D023 (`git switch main`, `npm run db:backup`,
+     `git switch feat/jarvis-core`). Genera el format 1 (`backups/projects.json`), que el
+     codi nou ja **no** pot restaurar i que s'atura si el fitxer ja existeix. No provat.
+3. **Migrar i verificar la BD** (terminal):
+
+   ```sh
+   npm run db:migrate
+   npm run db:verify
+   ```
+
+   `db:migrate` aplica la migració `003_tasks_notes_summary.sql` (taules `tasks`, `notes`,
+   `summary_runs` i columnes noves a `projects`) i dona al rol runtime els permisos per
+   columnes. Les migracions 001 i 002 ja aplicades es comproven pel checksum i no es
+   repeteixen. `db:verify` comprova que el rol runtime pot fer el que cal i res més (ni
+   esborrar ni canviar el propietari).
+   *Resultat:* `Migrations 001-003 and runtime table grants verified.` i després
+   `Runtime connection and minimum permissions verified.`
+   *Si falla:* `migration_mismatch` vol dir que un checksum no coincideix: s'atura **sense
+   canviar res**. No editis la migració per fer-la passar; revisa quin fitxer ha canviat.
+   `privileges_too_broad` vol dir que el rol runtime té massa o massa pocs permisos.
+
+   **3b. Còpia format 2** (terminal), ara que la BD ja té 001–003:
+
+   ```sh
+   npm run db:backup
+   ```
+
+   Desa projectes, tasques i notes en un fitxer **nou** amb data,
+   `backups/jarvis-<data>.json` (privat, ignorat per Git, mai sobreescriu).
+   *Resultat:* `Logical snapshot of projects, tasks and notes saved privately to ...`
+4. **Desplegar el codi** (terminal):
+
+   ```sh
+   npx wrangler whoami
+   npx wrangler deploy --env-file /dev/null --message 'D024 tasks, notes and daily summary'
+   ```
+
+   El deploy també crea el Cron Trigger. Sense secrets de Telegram, el cron es desperta però
+   no fa res ni toca la BD. A Windows, posa un fitxer buit local en lloc de `/dev/null`.
+   *Resultat:* Wrangler mostra l'URL, un ID de versió nou i el cron `30 5-8 * * *`.
+   *Si falla:* després del deploy, un 503 `service_unavailable` en qualsevol eina sol voler
+   dir que la migració 003 no s'ha aplicat (pas 3). Fes el pas 3 o desfés el deploy.
+5. **Reconnectar els clients Claude** (navegador i terminal). A Claude web/app,
+   Customize → Connectors → Jarvis: desconnectar i tornar a connectar (o refrescar). A
+   Claude Code, `/mcp` → `jarvis` → reconnectar. Revisa els permisos de cada eina: les de
+   lectura (`list_projects`, `get_daily_summary`…) poden anar a «Always allow»; les
+   d'escriptura (`create_task`, `save_note`, `send_daily_summary`…) a **«Needs approval»**.
+   *Resultat:* Jarvis mostra 13 eines.
+   *Si falla:* si encara en veus 2, el client conserva la llista antiga: cal reconnectar.
+6. **Validar amb dades fictícies** (xat de Claude). Demana, per exemple, «llista els meus
+   projectes», «crea una tasca fictícia per demà al projecte X» i «què tinc avui?» (eina
+   `get_daily_summary`). Després, en una conversa nova, recupera la tasca.
+   *Resultat:* les eines responen sense `isError` i la tasca es conserva entre converses.
+   Registra el resultat real a [CURRENT_STATE](CURRENT_STATE.md).
+
+### Telegram (opcional)
+
+Un **bot de Telegram** és un compte automàtic que creen els programes. Per parlar-hi des
+d'un programa cal el seu **token del bot**: és una contrasenya (qui la té pot enviar
+missatges com si fos el bot), per això és un secret i no surt mai del fitxer privat. El
+**chat id** és el número que identifica la teva conversa amb el bot. Jarvis **només** envia
+missatges a aquest chat configurat, i el bot no llegeix ni respon res (només de sortida).
+Recorda que el text del resum (títols de tasques i projectes) surt cap a Telegram, un
+servei extern.
+
+1. **Crear el bot** (app de Telegram). Parla amb `@BotFather`, envia `/newbot` i tria nom i
+   usuari. *Resultat:* BotFather et dona un token. No l'enganxis al xat de Claude.
+2. **Preparar el fitxer privat** (terminal):
+
+   ```sh
+   npm run telegram:setup
+   ```
+
+   Crea `.env.telegram.json` (permisos 0600, ignorat per Git) amb dos camps buits. Obre'l
+   amb l'editor i enganxa el token a `TELEGRAM_BOT_TOKEN`. No el mostris amb `cat`.
+   *Resultat:* `Created private .env.telegram.json. ...`
+   *Si falla:* si el fitxer ja existeix, l'ordre s'atura i no el sobreescriu.
+3. **Escriure al bot** (app de Telegram). Obre el teu bot i envia-li qualsevol missatge,
+   per exemple «hola». Així Telegram sap quin és el teu chat.
+4. **Desar el chat id** (terminal):
+
+   ```sh
+   npm run telegram:chat
+   ```
+
+   Pregunta a Telegram quin xat privat ha escrit al bot més recentment i en desa l'id al
+   fitxer. *Resultat:* `Chat <número> (<nom>) saved to .env.telegram.json. Check it is
+   yours.` Comprova que el nom és el teu.
+   *Si falla:* `no_private_message_found` vol dir que encara no has escrit al bot (pas 3)
+   o que ha passat massa temps; torna a escriure-li i repeteix. `invalid_bot_token` vol dir
+   que el token enganxat no té el format correcte.
+5. **Pujar els dos secrets** (terminal):
+
+   ```sh
+   npx wrangler secret bulk .env.telegram.json --name jarvis --env-file /dev/null
+   ```
+
+   *Resultat:* Wrangler confirma `TELEGRAM_BOT_TOKEN` i `TELEGRAM_CHAT_ID` pujats; els altres
+   secrets es conserven.
+6. **Provar l'enviament** (xat de Claude). Demana «envia'm el resum a Telegram» (eina
+   `send_daily_summary`, que ha de demanar aprovació). *Resultat:* reps el resum al teu
+   Telegram. Aquest enviament a demanda no compta per al resum automàtic del matí.
+   *Si falla:* `telegram_not_configured` (503) vol dir que falten els secrets o que tenen
+   format incorrecte; `telegram_failed` (502) vol dir que Telegram ha rebutjat l'enviament
+   (per exemple, chat id equivocat).
+
+L'endemà, entre les 7 i les 10 (hora de Madrid), hauria d'arribar un sol resum automàtic si
+hi ha alguna cosa a dir; un dia sense res a dir no envia res. Si l'enviament falla 3 cops,
+aquell dia no hi ha resum (es prefereix zero missatges a duplicats).
+
+**Apagar Telegram:** esborra els dos secrets (terminal):
+
+```sh
+npx wrangler secret delete TELEGRAM_BOT_TOKEN --name jarvis
+npx wrangler secret delete TELEGRAM_CHAT_ID --name jarvis
+```
+
+Sense aquests secrets, el cron no envia res i `send_daily_summary` retorna
+`telegram_not_configured`. Si sospites que el token s'ha filtrat, a més revoca'l a
+`@BotFather` (ordre `/revoke`) i, si vols continuar, repeteix els passos amb el token nou.
+
+### Desfer D024–D026
+
+**Desfer el desplegament:** `npx wrangler rollback` (terminal) torna a la versió de D023.
+Les taules i columnes noves poden quedar-se: el codi antic les ignora. L'únic canvi visible
+seria un projecte amb estat diferent d'`active`, que el codi antic mostra igualment. No s'ha
+provat què fa el Cron Trigger després d'un rollback; per assegurar que no s'envia res,
+esborra també els secrets de Telegram. La migració 003 no es desfà automàticament.
+
 ## Publicació de desenvolupament — D021, 2026-11-11
 
 La prohibició de publicar dels procediments històrics següents queda substituïda
@@ -247,16 +422,24 @@ npm run test:worker
 npm run build
 ```
 
-`npm test`: contracte HTTP/MCP amb storage simulat i serialització del driver Neon
-amb HTTP simulat. Inclou `tests/oauth.test.js`: flux OAuth complet amb el client
-oficial del SDK MCP i GitHub **simulat** (PKCE, redireccions, consentiment, rotació
-de tokens, falsificacions). No requereix BD, LLM, GitHub ni credencials reals.
+`npm test` (52 proves el 2026-11-25): contracte HTTP/MCP amb storage simulat i
+serialització del driver Neon amb HTTP simulat. Inclou `tests/oauth.test.js`: flux OAuth
+complet amb el client oficial del SDK MCP i GitHub **simulat** (PKCE, redireccions,
+consentiment, rotació de tokens, falsificacions); `tests/domain.test.js`: projectes,
+tasques, notes, resum diari, dates de Madrid i Telegram **simulat** (D024–D026), amb els
+escenaris compartits `tests/domain-storage.js` i `tests/grant-storage.js` sobre el
+simulador en memòria; i `tests/ops-unit.test.js`, les regles dels scripts operatius.
+No requereix BD, LLM, GitHub, Telegram ni credencials reals.
 `test:worker`: Wrangler/workerd local, ports 18787 i l'inspector de Wrangler;
-comprova salut, autenticació, descoberta MCP, metadades OAuth, registre i pantalla
-de consentiment per xarxa loopback, sense Neon ni GitHub.
+comprova salut, autenticació, descoberta MCP (13 eines), metadades OAuth, registre i
+pantalla de consentiment per xarxa loopback, sense Neon ni GitHub.
 `build`: només empaquetament `wrangler deploy --dry-run`, no desplega.
 `oauth:setup`: crea `.env.oauth.json` privat per al pas 2 de la
 [posada en marxa](#passos-de-posada-en-marxa-pendents); no sobreescriu mai.
+`telegram:setup`: crea `.env.telegram.json` privat (0600, ignorat per Git) amb els camps
+`TELEGRAM_BOT_TOKEN` i `TELEGRAM_CHAT_ID` buits; no sobreescriu mai. `telegram:chat`:
+amb el token ja enganxat, pregunta a Telegram quin xat privat ha escrit al bot i en desa
+l'id; no imprimeix el token. Passos a [Telegram (opcional)](#telegram-opcional).
 
 `npm run dev` escolta només a 127.0.0.1:8787. Sense configuració, `/health`
 funciona i les rutes privades fallen tancades. No hi ha fallback en memòria.
@@ -266,6 +449,8 @@ funciona i les rutes privades fallen tancades. No hi ha fallback en memòria.
 Instal·lar/arrencar PostgreSQL és una preparació local explícita. Crear una BD
 **descartable i buida** anomenada `jarvis_test`, només a loopback. No usar mai
 la BD personal ni la de desenvolupament. No hi ha Docker ni provisionament automàtic.
+La recepta concreta que s'ha fet servir en aquesta màquina és a
+[PostgreSQL local per a les proves d'integració](#postgresql-local-per-a-les-proves-dintegració).
 
 macOS/Linux:
 
@@ -295,10 +480,78 @@ SQL que producció amb un adaptador pg transaccional; no prova el servei Neon re
 
 Una segona prova aplica la migració 002 i executa sobre `oauth_grants` l'escenari
 compartit `tests/grant-storage.js`: codis d'un sol ús, rotació de refresh tokens i
-restriccions. El mateix escenari corre a `npm test` contra el simulador en memòria,
-perquè simulador i SQL real no divergeixin. **Aquesta prova encara no s'ha executat**
-(no hi havia PostgreSQL local); el SQL sí que s'ha provat sobre Neon amb ROLLBACK,
-vegeu [CURRENT_STATE](CURRENT_STATE.md).
+restriccions. Una tercera aplica la migració 003 sobre projectes ja existents (que es
+conserven) i executa l'escenari compartit `tests/domain-storage.js`: projectes, tasques,
+notes, registre del resum diari, restriccions, aïllament per propietari i 10 creacions i
+10 reclamacions concurrents. Tots dos escenaris corren també a `npm test` contra el
+simulador en memòria, perquè **simulador i SQL real no divergeixin**: si el simulador
+accepta una cosa que PostgreSQL rebutja, la mateixa prova falla en un dels dos costats.
+
+**Executades per primer cop el 2026-11-25** (PostgreSQL 17.12 local): `test:postgres` 3/3,
+també sobre el codi de D023. Això tanca el pendent de D023, quan no hi havia PostgreSQL
+local i el SQL de `oauth_grants` només s'havia provat sobre Neon amb ROLLBACK.
+Evidència a [CURRENT_STATE](CURRENT_STATE.md). No prova el driver HTTP de Neon.
+
+### PostgreSQL local per a les proves d'integració
+
+Què es va fer en aquesta màquina (macOS arm64, 2026-11-25): instal·lar PostgreSQL 17 amb
+Homebrew i crear un **clúster descartable** en un directori temporal. Un clúster és una
+instal·lació de PostgreSQL amb les seves BD, rols i fitxers; aquest no té res a veure amb
+Neon, mai conté dades reals i es pot esborrar sencer en acabar.
+
+Decisions de la recepta: escolta només a `127.0.0.1:55432` (un port diferent del 5432 per no
+xocar amb cap altre PostgreSQL); autenticació `trust` (sense contrasenya, acceptable només
+perquè és loopback i descartable); i **sense socket Unix**, perquè en un directori temporal
+profund la ruta del socket superava el límit de longitud i el servidor no arrencava.
+
+Recepta reproduïble (terminal, macOS amb Homebrew). `DIRECTORI_TEMPORAL` és un marcador:
+crea'l amb `mktemp -d` i no el posis dins del projecte.
+
+```sh
+brew install postgresql@17
+PGBIN="$(brew --prefix postgresql@17)/bin"
+PGTMP="$(mktemp -d)"   # el teu DIRECTORI_TEMPORAL
+"$PGBIN/initdb" -D "$PGTMP/data" -U postgres --auth=trust
+"$PGBIN/pg_ctl" -D "$PGTMP/data" -l "$PGTMP/server.log" \
+  -o "-p 55432 -c listen_addresses=127.0.0.1 -c unix_socket_directories=''" start
+for db in jarvis_test jarvis_dev jarvis_restore; do
+  "$PGBIN/createdb" -h 127.0.0.1 -p 55432 -U postgres "$db"
+done
+```
+
+*Resultat:* `pg_ctl` diu `server started` i les tres BD existeixen buides.
+*Si falla:* mira `$PGTMP/server.log`; un port ocupat vol dir que ja hi ha un clúster a
+55432 (atura'l abans).
+
+Proves d'integració SQL (mateix terminal):
+
+```sh
+TEST_DATABASE_URL='postgresql://postgres@127.0.0.1:55432/jarvis_test' npm run test:postgres
+```
+
+*Resultat esperat:* 3 proves passades. Es pot repetir: cada execució usa un schema propi.
+
+Proves operatives (rols, migracions, permisos, còpia i restauració):
+
+```sh
+OPS_TEST_ADMIN_URL='postgresql://postgres@127.0.0.1:55432/jarvis_dev' \
+OPS_TEST_ISOLATED_CLUSTER=true npm run test:ops
+```
+
+*Resultat esperat:* 1 prova passada. **Necessita un clúster acabat de crear a cada
+execució**, perquè crea els rols `jarvis_migrator` i `jarvis_runtime` i omple
+`jarvis_dev` i `jarvis_restore`, i no esborra res en acabar. Per repetir-la, atura i
+esborra el clúster i torna a fer la recepta.
+
+Aturar i esborrar el clúster (terminal):
+
+```sh
+"$PGBIN/pg_ctl" -D "$PGTMP/data" stop
+rm -rf "$PGTMP"
+```
+
+Comprova abans que `$PGTMP` és el directori temporal que has creat i no una altra ruta.
+A Windows aquesta recepta no s'ha provat.
 
 ## Preparació externa autoritzada — D017
 
@@ -389,19 +642,26 @@ npm run dev:verify-neon
   CREATEROLE, BYPASSRLS o membresies. Configura permisos separats per BD i schema.
   Desa primer les credencials a `.env.database`, amb mode Unix 0600, per conservar
   capacitat de recuperació si una operació remota falla parcialment.
-- `db:migrate`: aplica les SQL revisades 001 i 002 (`oauth_grants`, D023) i registra
-  cada checksum a `jarvis_migrations` en transacció. Repetir-la és segur només si els
-  checksums coincideixen. Concedeix al runtime `SELECT, INSERT, UPDATE` sobre
-  `oauth_grants`, mai DELETE. Si hi ha esquema antic sense ledger, s'atura.
-- `db:verify`: prova TLS, connexió i privilegis mínims. Runtime: SELECT, INSERT i
-  UPDATE(idempotency_key) a projects, sense DELETE, edició de name ni CREATE al schema;
-  també els permisos sobre `oauth_grants`.
+- `db:migrate`: aplica les SQL revisades 001, 002 (`oauth_grants`, D023) i 003 (`tasks`,
+  `notes`, `summary_runs` i camps nous de `projects`, D024–D026) i registra cada checksum
+  a `jarvis_migrations` en transacció. Repetir-la és segur només si els checksums
+  coincideixen. Concedeix al runtime permisos **per columnes**: `SELECT` i `INSERT`, i
+  `UPDATE` només dels camps editables (p. ex. `title`, `status`, `due_date` a `tasks`).
+  Mai DELETE ni `UPDATE` de `owner_id`, `id`, `created_at` o `request_hash`; a
+  `oauth_grants`, `SELECT, INSERT, UPDATE`. Si hi ha esquema antic sense ledger, s'atura.
+- `db:verify`: prova TLS, connexió i privilegis mínims del runtime: sense superusuari ni
+  membresies; pot llegir i inserir a `projects`, `tasks`, `notes`, `summary_runs` i
+  `oauth_grants` i editar-ne els camps permesos; no pot esborrar files, canviar el
+  propietari de projectes, tasques o notes ni crear objectes al schema.
 - `token`: genera un token nou i el desa a `.env.client`; `.dev.vars` conté només
   hash, caducitat, owner i URL runtime. **Ja no imprimeix secrets.** Cap fitxer existent
   se sobreescriu; una rotació requereix decisió local explícita sobre els fitxers.
 - `dev:verify-neon`: crea dos projectes ficticis amb claus estables i prova API→MCP
   i MCP→API amb instàncies noves. Utilitza l'adaptador real Neon des de Node;
   no publica servidor, no prova encara workerd remot ni clients conversacionals.
+  Tant aquesta com `dev:verify-worker-neon` i `dev:verify-remote` necessiten un token
+  fix **vigent**: el darrer va caducar el 2026-11-25. Per usar-les, `npm run token:rotate`
+  (i, per al remot, pujar els dos secrets com a la [renovació](#renovar-el-token-fix-opcional)).
 
 No hi ha una transacció global entre dues BD. Si el provisionament falla després
 de desar credencials, no reexecutar ni esborrar fitxers a cegues: revisar l'estat
@@ -414,19 +674,24 @@ npm run db:backup
 npm run db:restore
 ```
 
-La còpia es desa a `backups/projects.json` (directori ignorat, fitxer Unix 0600).
-Llegeix projects sota transacció REPEATABLE READ READ ONLY i conserva IDs, propietari,
-dates, estat i idempotència. Inclou format i checksum de la migració; es valida
-l'estructura i el SHA-256. Màxim 10.000 projectes, només dades fictícies.
+**Format 2 (D026).** Cada `db:backup` desa un fitxer **nou** amb data,
+`backups/jarvis-<data>.json` (directori ignorat, fitxer Unix 0600); mai sobreescriu una
+còpia anterior. Llegeix `projects`, `tasks` i `notes` sota transacció REPEATABLE READ READ
+ONLY i conserva IDs, propietari, dates, estat i idempotència. Inclou format i checksums de
+les migracions 001–003; es valida l'estructura de cada fila i el SHA-256. Si la BD no té
+exactament 001–003, s'atura amb `migration_mismatch`. Màxims: 10.000 projectes i 50.000
+tasques i notes; només dades fictícies. L'antic `backups/projects.json` (format 1) ja no es
+pot restaurar amb aquest codi.
 
-La restauració només admet `jarvis_restore`, al mateix endpoint, amb el rol
-migrador i sense taules existents. Aplica esquema i files atòmicament i compara
-el snapshot resultant complet. Mai esborra el destí ni toca la BD d'origen.
+`db:restore` restaura la còpia **més recent** (per nom amb data). Només admet
+`jarvis_restore`, al mateix endpoint, amb el rol migrador i sense taules existents.
+Reconstrueix tot l'esquema (001–003), insereix les files atòmicament i compara el
+snapshot resultant complet. Mai esborra el destí ni toca la BD d'origen.
 Fitxer preexistent o destí ocupat: falla tancat, no sobreescriu. No és pg_dump
 complet: exclou rols, configuració, altres taules i recuperació del compte.
 Checksum detecta corrupció, no autentica còpies externes desconegudes.
-La còpia no inclou `oauth_grants` i la restauració només aplica 001: després de
-restaurar cal executar `db:migrate` i tornar a connectar els clients OAuth.
+La còpia no inclou `oauth_grants` ni `summary_runs` (estat operatiu, no dades de
+l'usuari): després de restaurar cal tornar a connectar els clients OAuth.
 
 Aquesta és una prova acotada de restauració; no una política operativa per dades
 personals. La còpia és local i no té xifrat propi ni retenció automatitzada.
@@ -453,16 +718,20 @@ més recent que el Node de les proves locals inicials. No s'ha validat manualmen
 
 ## Proves de les operacions
 
-`npm test` inclou límits de destí, TLS, corrupció de còpies, fitxers privats sense
-overwrite (també `.env.oauth.json`) i la detecció de la migració 002. `npm run test:ops` requereix un **clúster local descartable nou**, amb
+`npm test` inclou límits de destí, TLS, corrupció de còpies format 2, fitxers privats
+sense overwrite (també `.env.oauth.json` i `.env.telegram.json`) i la detecció de les
+migracions 002 i 003. `npm run test:ops` requereix un **clúster local descartable nou**, amb
 `jarvis_dev` i `jarvis_restore` buides, `OPS_TEST_ADMIN_URL` loopback i
 `OPS_TEST_ISOLATED_CLUSTER=true`. Crea rols amb noms fixos en aquest clúster;
 no donar-hi mai un servidor personal ni la configuració Neon de desenvolupament.
 No elimina dades o rols al final: descartar/aturar el clúster de proves expressament.
 
-La suite prova migració repetible, permisos negatius runtime, persistència,
-restauració completa, reobertura d'una connexió i replay d'idempotència restaurat.
-Són proves PostgreSQL reals però no acrediten per si soles accés al servei Neon.
+La suite prova migracions 001–003 repetibles amb ledger, **tot l'escenari de domini
+executat amb el rol runtime**, permisos negatius (DELETE, canvi de propietari, DDL),
+persistència, restauració completa, reobertura d'una connexió i replay d'idempotència
+restaurat. **Executada per primer cop el 2026-11-25: 1/1** amb el
+[clúster local](#postgresql-local-per-a-les-proves-dintegració). Són proves PostgreSQL
+reals però no acrediten per si soles accés al servei Neon.
 
 ## Límits gratuïts consultats — 2026-11-09
 

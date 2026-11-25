@@ -5,12 +5,15 @@ inclou memòria personal, projectes, tasques, universitat, entrenaments,
 integracions i seguiment proactiu per Telegram. Són objectius; l'abast executable
 es consulta exclusivament a [CURRENT_STATE](docs/CURRENT_STATE.md).
 
-## Primer increment
+## Què fa ara
 
-Cloudflare Worker JavaScript amb API HTTP i MCP Streamable HTTP per crear i
-recuperar projectes, SQL explícit sobre Neon PostgreSQL i autenticació OAuth 2.1
-amb inici de sessió de GitHub (D023), pensada per connectar Claude. Idempotència
-opcional i aïllament per propietari. Només dades fictícies.
+Cloudflare Worker JavaScript amb API HTTP i MCP Streamable HTTP, SQL explícit sobre Neon
+PostgreSQL i autenticació OAuth 2.1 amb inici de sessió de GitHub (D023), pensat per
+connectar Claude. Al codi (D024–D026, versió 0.2.0) Jarvis gestiona projectes (llistar,
+cercar, pausar, arxivar, prioritzar), tasques amb venciment, notes de memòria explícita
+(decisions, preguntes obertes, fets, preferències), la vista d'un projecte i un resum diari
+per regles que es pot enviar per Telegram. 13 eines MCP i les rutes API equivalents, amb
+idempotència opcional i aïllament per propietari. Només dades fictícies.
 
 Amb Node >=22.19.0 i npm:
 
@@ -23,19 +26,20 @@ npm run build
 ```
 
 Les proves PostgreSQL dedicades i la configuració d'execució estan a la
-[guia de desenvolupament](docs/DEVELOPMENT.md). Neon Frankfurt/Free, permisos, persistència i restauració de desenvolupament
-estan verificats, inclòs Worker local→Neon. Worker publicat segons D021; HTTPS i circuit API/MCP→Neon remots verificats.
-L'OAuth amb GitHub (D023) està desplegat i verificat amb Claude web/app: crear un
-projecte en un xat i recuperar-lo en un altre funciona. Claude Code també verificat; Codex pendent. `npm run dev`
-arrenca en loopback; sense secrets, només salut és operativa.
+[guia de desenvolupament](docs/DEVELOPMENT.md). **Estat:** la versió publicada és encara la
+de D023 (2 eines: crear i recuperar projectes), verificada amb Claude web/app i Claude Code.
+D024–D026 estan implementats i provats localment (simuladors i PostgreSQL local), però
+**no desplegats**: la migració 003 no s'ha aplicat a Neon i Telegram i els clients Claude
+reals no s'han provat amb les eines noves. `npm run dev` arrenca en loopback; sense
+secrets, només salut és operativa.
 
 ## Documents principals
 
-- [Visió](docs/PRODUCT_VISION.md) i [casos d'ús futurs](docs/USE_CASES.md).
+- [Visió](docs/PRODUCT_VISION.md) i [casos d'ús](docs/USE_CASES.md).
 - [Estat real](docs/CURRENT_STATE.md), [decisions](docs/DECISIONS.md) i [roadmap](docs/roadmap.md).
 - [Arquitectura](docs/ARCHITECTURE.md) i [model de dades](docs/DATA_MODEL.md).
 - [API](docs/API_CONTRACT.md) i [MCP](docs/MCP_CONTRACT.md).
-- [Seguretat](docs/SECURITY_PRIVACY.md) i [automatitzacions futures](docs/AUTOMATIONS.md).
+- [Seguretat](docs/SECURITY_PRIVACY.md) i [automatitzacions](docs/AUTOMATIONS.md).
 - [Execució i proves](docs/DEVELOPMENT.md), [aprenentatge](docs/learning/learning-log.md)
   i [normes de desenvolupament](AGENTS.md).
 

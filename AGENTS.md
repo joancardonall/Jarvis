@@ -132,10 +132,14 @@ entrenaments, integracions i seguiment proactiu per Telegram.
 
 ## Increment actual i següent tasca
 
-Autoritzat i implementat: crear i recuperar projectes (D011–D014) i autenticació OAuth
-amb GitHub (D023). **Següent tasca:** posar en marxa D023 (migració, secrets, publicació)
-i validar-la amb Claude web/app i Claude Code reals, seguint la guia de
-`docs/DEVELOPMENT.md`. Publicar, pujar secrets i migrar la BD real els executa o els
-confirma l'usuari. Després es continua amb el desenvolupament segons `docs/roadmap.md`
-(`list_projects`, tasques, resum per Telegram); cada funcionalitat nova necessita
-l'aprovació del seu abast. L'estat real es consulta sempre a `docs/CURRENT_STATE.md`.
+Autoritzat i implementat: crear i recuperar projectes (D011–D014), autenticació OAuth amb
+GitHub (D023, desplegada i verificada) i el circuit complet de projectes, tasques, memòria
+explícita, resum diari i Telegram (D024–D026, implementat a la branca `feat/jarvis-core`).
+**Següent tasca:** posar en marxa D024–D026 seguint la guia de `docs/DEVELOPMENT.md` i
+validar-ho amb Claude web/app, Claude Code i Telegram reals. Publicar, pujar secrets, migrar
+la BD real i fusionar a main els executa o els confirma l'usuari.
+
+Després es continua segons `docs/roadmap.md`. Cada funcionalitat nova necessita l'aprovació
+del seu abast. Continua prohibit desar dades personals reals fins que existeixi una política
+de dades (retenció, esborrat i còpies). L'estat real es consulta sempre a
+`docs/CURRENT_STATE.md`.

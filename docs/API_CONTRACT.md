@@ -1,48 +1,154 @@
-# Contracte API — increment de projectes
+# Contracte API
 
 Estat de verificació a [CURRENT_STATE](CURRENT_STATE.md). Seguretat i credencials a
 [SECURITY_PRIVACY](SECURITY_PRIVACY.md); dades a [DATA_MODEL](DATA_MODEL.md).
 
+**Estat:** crear i recuperar projectes (D011–D014) està desplegat. La resta de rutes
+(D024–D026) estan **implementades i provades localment** (simuladors i PostgreSQL local),
+però **no desplegades**: el Worker públic encara no les té. API i MCP criden els mateixos
+serveis ([MCP_CONTRACT](MCP_CONTRACT.md)), per tant validació i errors són idèntics.
+
+## Rutes
+
+Totes porten `Authorization: Bearer` (vegeu [Autenticació](#autenticació)). Els cossos són
+JSON (`Content-Type: application/json`). No hi ha cap ruta `DELETE`.
+
 | Mètode i ruta | Entrada | Resposta |
 | --- | --- | --- |
 | GET /health | Cap | 200 `{"status":"ok"}`; liveness, no comprova BD |
-| POST /api/v1/projects | JSON amb `name`, `description?`; capçalera `Idempotency-Key?` | 201 projecte, també en replay |
+| POST /api/v1/projects | `name`, `description?`; capçalera `Idempotency-Key?` | 201 projecte, també en replay |
+| GET /api/v1/projects | Query `status?`, `query?`, `limit?` | 200 `{projects, truncated}` |
 | GET /api/v1/projects/{id} | UUID | 200 projecte; 404 si absent o d'un altre propietari |
+| PATCH /api/v1/projects/{id} | Almenys un de `name`, `description`, `status`, `priority`, `review_at`, `snoozed_until` | 200 projecte |
+| GET /api/v1/projects/{id}/overview | UUID | 200 `{project, open_tasks, notes, truncated}` |
+| POST /api/v1/tasks | `title`, `notes?`, `project_id?`, `due_date?`, `priority?`; `Idempotency-Key?` | 201 tasca, també en replay |
+| GET /api/v1/tasks | Query `project_id?`, `status?`, `due_before?`, `limit?` | 200 `{tasks, truncated}` |
+| PATCH /api/v1/tasks/{id} | Almenys un de `title`, `notes`, `status`, `priority`, `due_date`, `project_id` | 200 tasca |
+| POST /api/v1/notes | `kind`, `content`, `project_id?`, `source?`; `Idempotency-Key?` | 201 nota, també en replay |
+| GET /api/v1/notes | Query `query?`, `kind?`, `project_id?`, `include_inactive?`, `limit?` | 200 `{notes, truncated}` |
+| PATCH /api/v1/notes/{id} | Almenys un de `content`, `kind`, `status` | 200 nota |
+| GET /api/v1/daily-summary | Query `date?` | 200 resum del dia |
+| POST /api/v1/daily-summary/send | Sense cos | 200 `{"sent":true,"date":"YYYY-MM-DD"}` |
+
+Camps desconeguts, al cos o a la query, es rebutgen amb 422. `idempotency_key` mai va al
+cos (422): només a la capçalera. `owner_id`, `id`, dates del servidor (`created_at`,
+`updated_at`, `last_activity_at`, `completed_at`) i l'estat inicial són exclusius del servidor.
+
+## Projectes
 
 `name`: text d'1–200 caràcters, no només espais; es conserva sense trim silenciós.
-`description`: text de fins a 2.000, per defecte cadena buida. Camps desconeguts
-rebutjats. `owner_id`, `id`, `status` i dates són exclusius del servidor.
+`description`: text de fins a 2.000, per defecte cadena buida. `status`: `active`,
+`paused`, `completed` o `archived` (un projecte nou sempre és `active`). `priority`:
+`low`, `normal` o `high`. `review_at` (quan ha de tornar un projecte pausat) i
+`snoozed_until` (sense recordatoris fins aquell dia) són dates; `null` les esborra.
+Passar a un estat que no és `paused` esborra `review_at` si no s'envia explícitament.
+Arxivar substitueix esborrar.
 
-La resposta conté `id`, `name`, `description`, `status: "active"`, `created_at` i
-`updated_at` en ISO UTC. No exposa propietari, clau ni empremta.
+La resposta conté `id`, `name`, `description`, `status`, `priority`, `review_at`,
+`snoozed_until`, `created_at`, `updated_at` i `last_activity_at`. No exposa propietari,
+clau ni empremta. `last_activity_at` canvia en editar el projecte o en crear/editar les
+seves tasques o notes.
+
+Llistat: ordenat per `last_activity_at` (més recent primer). Sense `status`, els arxivats
+s'amaguen; amb `status=archived` es veuen només aquests. `query` (1–100 caràcters) cerca
+literalment, sense distingir majúscules, a `name` i `description`; `%` i `_` no són comodins.
+
+`overview` retorna el projecte, fins a 100 tasques obertes (`open_tasks`) i fins a 100
+notes actives, amb `truncated: true` si n'hi ha més.
+
+## Tasques
+
+`title`: 1–300 caràcters, no només espais. `notes`: fins a 4.000, per defecte buit.
+`status`: `open` (en crear), `done` o `cancelled`; en passar a `done` el servidor posa
+`completed_at`, i l'esborra si es reobre. `priority` per defecte `normal`. `project_id` ha
+de ser un projecte propi; a `PATCH`, `null` desvincula la tasca i `due_date: null` treu el
+venciment. Les tasques no s'esborren: es cancel·len.
+
+Resposta: `id`, `project_id`, `title`, `notes`, `status`, `priority`, `due_date`,
+`created_at`, `updated_at`, `completed_at`.
+
+Llistat: per defecte només obertes; `status` pot ser `open`, `done`, `cancelled` o `all`.
+`due_before` retorna les que vencen aquell dia o abans (les que no tenen data queden fora).
+Ordre: venciment (sense data al final), després prioritat (alta primer).
+
+## Notes (memòria explícita)
+
+`kind`: `decision` (decisió confirmada), `open_question` (decisió pendent), `fact`,
+`preference` o `note`. `content`: 1–4.000 caràcters, no només espais. `source`: d'on ve
+la informació, fins a 200. `status`: `active` o `inactive`; «oblidar» és `inactive` (no
+s'esborra, es pot tornar a `active`). El projecte d'una nota no es pot canviar.
+
+Resposta: `id`, `project_id`, `kind`, `content`, `source`, `status`, `created_at`,
+`updated_at`. Cerca: ordenada per creació (més recent primer); per defecte només actives,
+`include_inactive=true` inclou les oblidades; `query` cerca literalment a `content`.
+
+## Resum diari
+
+`date` opcional (per defecte avui a Madrid). Resposta: `date`, `time_zone`
+(`Europe/Madrid`), `overdue`, `due_today`, `due_this_week` (tasques obertes que vencen
+els 7 dies següents), `follow_ups` (com a màxim 3 projectes), `is_empty`, `truncated` i
+`text` (missatge en català fet amb plantilles). Cada tasca porta `id`, `title`,
+`due_date`, `priority`, `project_id` i `project_name`; cada seguiment, `project_id`,
+`project_name`, `reason` (`review_due`, `pending_decision` o `inactive`) i `detail`.
+Regles a [AUTOMATIONS](AUTOMATIONS.md).
+
+`POST /api/v1/daily-summary/send` envia el resum d'avui a Telegram ara mateix, fora del
+registre diari (pot repetir-se). Telegram real **no verificat**.
+
+## Formats comuns
+
+**Dates de calendari**: `YYYY-MM-DD`, sense hora, interpretades a Europe/Madrid
+(`due_date`, `due_before`, `review_at`, `snoozed_until`, `date`). Dates impossibles com
+`2030-02-30` es rebutgen. Instants (`created_at`…) en ISO 8601 UTC. Motiu a
+[DATA_MODEL](DATA_MODEL.md).
+
+**Llistats**: `limit` d'1 a 200 (per defecte 50). Si hi ha més resultats que el límit, la
+resposta porta `truncated: true`; no hi ha paginació, cal afinar els filtres.
+`include_inactive` accepta `true` o `false`.
 
 ## Idempotència opcional
 
-Sense clau, cada POST crea un projecte nou, encara que contingui el mateix nom.
-Amb clau, identificador ASCII `[A-Za-z0-9._:-]` d'1–128 caràcters, es garanteix
-un únic projecte per propietari/clau. Mateix nom/descripció retorna el mateix
-projecte; contingut diferent retorna 409. Ometre descripció equival a `""`.
-La clau viu a la capçalera HTTP, no al JSON. La retenció dura tant com el projecte;
-no hi ha eliminació ni expiració de claus en aquest increment.
+Aplica a `POST` de projectes, tasques i notes. Sense clau, cada POST crea un registre nou,
+encara que el contingut sigui igual. Amb clau, identificador ASCII `[A-Za-z0-9._:-]`
+d'1–128 caràcters, es garanteix un únic registre per propietari/clau i tipus. Mateix
+contingut retorna el mateix registre (201); contingut diferent retorna 409. Els camps
+omesos compten amb el seu valor per defecte (ometre `description` equival a `""`).
+La clau viu a la capçalera HTTP, no al JSON. La retenció dura tant com el registre;
+no hi ha eliminació ni expiració de claus. Les edicions (`PATCH`) no porten clau.
 
 No hi ha retries automàtics de POST sense clau. Si la connexió es talla o
 caduca el timeout després del commit, el client pot rebre un error tot i haver-se
-desat el projecte. Només reintentar amb la mateixa clau permet deduplicar-lo.
+desat el registre. Només reintentar amb la mateixa clau permet deduplicar-lo.
 
 ## Errors i límits
 
 Cos HTTP d'error: `{"error":"code"}`. 400 JSON invàlid o HTTPS requerit,
 401 credencial invàlida/caducada, 403 origen prohibit, 404 recurs/ruta absent,
 409 conflicte d'idempotència, 413 cos >16 KiB, 415 Content-Type incorrecte,
-422 dades/clau/UUID invàlids, 503 configuració incompleta o servei no disponible.
-Errors inesperats es redueixen a 503 sense detall intern.
+422 dades/clau/UUID invàlids, 502 Telegram ha fallat, 503 configuració incompleta o
+servei no disponible. Errors inesperats es redueixen a 503 sense detall intern.
+
+| Codi | Estat | Quan |
+| --- | --- | --- |
+| `invalid_project`, `invalid_project_id` | 422 | Alta o UUID de projecte invàlids |
+| `invalid_project_filter`, `invalid_project_update` | 422 | Filtres del llistat o canvis invàlids (o cap canvi) |
+| `invalid_task`, `invalid_task_filter`, `invalid_task_update` | 422 | Alta, filtres o canvis de tasca invàlids |
+| `invalid_note`, `invalid_note_filter`, `invalid_note_update` | 422 | Alta, filtres o canvis de nota invàlids |
+| `invalid_summary_date` | 422 | `date` del resum invàlida |
+| `project_not_found` | 404 | Projecte inexistent o d'un altre propietari (també en vincular-hi una tasca o nota) |
+| `task_not_found`, `note_not_found` | 404 | Tasca o nota inexistent o d'un altre propietari |
+| `idempotency_conflict` | 409 | Mateixa clau amb contingut diferent |
+| `telegram_failed` | 502 | Telegram no ha acceptat el missatge |
+| `telegram_not_configured` | 503 | Falten `TELEGRAM_BOT_TOKEN` o `TELEGRAM_CHAT_ID` vàlids |
+
+Un recurs d'un altre propietari respon igual que un d'inexistent: no es revela si existeix.
 
 Sense CORS habilitat per a una app web; l'origen de desenvolupament MCP es pot
 autoritzar explícitament. Respostes privades no emmagatzemables (`Cache-Control: no-store`).
 
 ## Autenticació
 
-Totes les rutes privades (`/api/v1/projects…` i `/mcp`) requereixen
+Totes les rutes privades (`/api/v1/…` i `/mcp`) requereixen
 `Authorization: Bearer <token>`, amb una d'aquestes credencials:
 
 - **Access token OAuth** (`jvs_at_…`, 1 h), obtingut amb el flux de D023. És la via

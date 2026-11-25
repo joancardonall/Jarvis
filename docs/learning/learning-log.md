@@ -228,3 +228,67 @@ Preguntes de comprensió:
 3. Per què canviar `OAUTH_SIGNING_KEY` desconnecta tots els clients alhora?
 
 Cap concepte es marca com a après sense confirmació de l'usuari.
+
+## 2026-11-25 — Tasques, memòria, resum diari i Telegram (D024–D026)
+
+Què s'ha fet i per què: fins ara Jarvis només sabia crear i recuperar projectes. L'usuari
+ha aprovat un circuit complet perquè Jarvis sigui útil cada dia: projectes amb estat i
+prioritat, **tasques**, **notes** de memòria (decisions, preguntes obertes, fets,
+preferències), un resum de projecte, un **resum diari** fet amb regles transparents (sense
+IA) i, opcionalment, l'enviament d'aquest resum per **Telegram** cada matí. Tot amb el mateix
+Worker, la mateixa BD (migració 003) i cap dependència ni servei nou; de 2 a 13 eines MCP.
+Procediment a [DEVELOPMENT](../DEVELOPMENT.md), evidència a
+[CURRENT_STATE](../CURRENT_STATE.md), riscos a [SECURITY_PRIVACY](../SECURITY_PRIVACY.md).
+
+Conceptes clau, amb un exemple de Jarvis:
+
+- **Data de calendari vs instant.** Un instant és un moment exacte (`2026-11-25T23:30:00Z`);
+  una data de calendari és un dia sense hora (`2026-11-26`). El venciment d'una tasca és un
+  dia, no un instant. Però «avui» depèn de la zona horària: a les 23:30 UTC a Madrid ja és
+  l'endemà. Per això Jarvis calcula «avui» a Europe/Madrid i rebutja dates impossibles com
+  `2030-02-30`.
+- **Escriptura atòmica en una sola sentència i CTE.** Atòmica vol dir «tot o res». El driver
+  HTTP de Neon no permet obrir una transacció i fer-hi diverses consultes, així que cada
+  operació és **una sola sentència SQL**. Quan cal tocar dues taules, una CTE (`WITH ...`,
+  una consulta amb passos amb nom) ho fa en una sentència: crear una tasca i actualitzar el
+  `last_activity_at` del seu projecte passen juntes o no passen.
+- **Clau forana composta com a segon pany.** El codi ja filtra per propietari, però tasques i
+  notes apunten a `(project_id, owner_id)`. Si un error del codi intentés lligar la teva
+  tasca al projecte d'un altre propietari, la BD mateixa ho rebutjaria.
+- **Esborrat suau: «oblidar» = inactiu.** Quan dius «oblida aquesta nota», passa a
+  `inactive`: deixa de sortir a les cerques però continua a la BD i es pot recuperar. És
+  segur davant d'errors, però no és un esborrat real per privacitat.
+- **Cron Trigger en UTC i canvi d'hora.** Un cron és un despertador programat. Cloudflare
+  l'interpreta en UTC, que no té horari d'estiu, i les 7 de Madrid són les 6 UTC a l'hivern i
+  les 5 UTC a l'estiu. Per això el Worker es desperta 4 cops cada matí (5:30–8:30 UTC) i ell
+  mateix comprova si a Madrid ja són les 7.
+- **At-most-once amb un registre vs at-least-once.** *At-least-once* (com a mínim un cop)
+  garanteix que el missatge arriba però pot duplicar-se; *at-most-once* (com a màxim un cop)
+  mai duplica però pot perdre'n un. Jarvis «reclama» el dia a la taula `summary_runs` abans
+  d'enviar: si dos despertars coincideixen, només un guanya; si el Worker mor a mig camí,
+  aquell dia no hi ha resum. Preferim zero missatges a dos.
+- **Mínim privilegi per columnes.** El rol runtime pot editar el `title` o l'`status` d'una
+  tasca, però no el seu `owner_id` ni esborrar-la. Si algú aconseguís executar SQL amb
+  aquest rol, no podria esborrar res ni regalar dades a un altre propietari.
+- **Escenari de prova compartit.** `tests/domain-storage.js` és una sola llista de passos
+  que s'executa contra el simulador en memòria (a `npm test`) i contra PostgreSQL real. Si el
+  simulador acceptés una data que PostgreSQL rebutja, una de les dues execucions fallaria:
+  així el simulador no pot «enganyar-nos» divergint del SQL real.
+
+Verificat realment (2026-11-25, Node 26.13.1): `npm test` 52/52; `test:worker` 1/1 en
+workerd (13 eines); `check` i `build`; dates de Madrid comprovades dins de workerd (hivern i
+estiu). Amb un clúster PostgreSQL 17 local i descartable, **per primer cop en aquesta
+màquina**: `test:postgres` 3/3 i `test:ops` 1/1 (tot l'escenari amb el rol runtime i permisos
+negatius), també sobre el codi de D023, cosa que tanca aquell pendent.
+**No verificat:** res desplegat; migració 003 no aplicada a Neon; driver HTTP de Neon amb el
+SQL nou; Telegram real (només simulat); Cron Trigger real; clients Claude reals amb les eines
+noves. Limitacions: sense esborrat real ni exportació, una sola zona horària, el resum no
+inclou calendari ni entrenaments i els títols viatgen a Telegram, un servei extern.
+
+Preguntes de comprensió:
+1. Per què a les 23:30 UTC del 25 de novembre una tasca que venç el 26 ja és «per avui»?
+2. Què passaria amb el resum d'un dia si el Worker morís just després de reclamar-lo, i per
+   què ho preferim a l'alternativa?
+3. Quina protecció afegeix la clau forana composta si el codi ja filtra per propietari?
+
+Cap concepte es marca com a après sense confirmació de l'usuari.

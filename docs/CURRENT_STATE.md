@@ -7,14 +7,81 @@ Visió a [PRODUCT_VISION](PRODUCT_VISION.md), motius a [DECISIONS](DECISIONS.md)
 
 D011–D014: Workers JavaScript, Neon Free PostgreSQL, API i MCP al mateix Worker,
 SQL explícit, autenticació temporal amb propietari derivat del token i idempotència
-opcional. Únic increment autoritzat: crear i recuperar projectes amb dades fictícies.
-Sense gestió completa d'usuaris, rols d'aplicació, OAuth, tasques, Telegram, Calendar o web.
+opcional. Primer increment: crear i recuperar projectes amb dades fictícies, sense gestió
+d'usuaris ni rols d'aplicació. Les decisions posteriors l'amplien:
+**D024–D026 (2026-11-25):** projectes complets, tasques, notes, resum diari, Telegram i còpia
+ampliada; aprovades com a llista de deu increments, sense autoritzar desplegament ni dades reals.
 **D023 (2026-11-24):** autenticació OAuth 2.1 pròpia amb inici de sessió de GitHub,
 aprovada amb implementació completa, commit i push de la branca. Substitueix el
 «sense OAuth» de la línia anterior. Publicar-la continua sent una acció de l'usuari.
 D017 autoritza preparar recursos Free, migrar i provar recuperació amb dades
 fictícies. D021 autoritza publicar el Worker de desenvolupament i preparar la
 connexió amb Claude Code, ara disponible; només dades fictícies i pla Free.
+
+## Resum en una frase
+
+**Publicat i verificat:** crear i recuperar projectes amb OAuth de GitHub (D023), des de Claude
+web/app i Claude Code. **Implementat però no publicat:** llistar i editar projectes, tasques,
+notes, resum diari i Telegram (D024–D026), a la branca `feat/jarvis-core`.
+
+## Projectes, tasques, memòria, resum i Telegram (D024–D026) — implementat, NO desplegat
+
+Aprovat per l'usuari el 2026-11-25 com a llista de deu increments a fer sense interrupcions.
+No autoritzat: desplegar, migrar la BD real, fusionar a main ni dades personals reals.
+**El Worker públic continua exposant només les 2 eines de D023** i Neon només té les
+migracions 001 i 002. Decisions a [DECISIONS](DECISIONS.md), passos d'activació a
+[DEVELOPMENT](DEVELOPMENT.md).
+
+**Implementat** (detall a [API](API_CONTRACT.md), [MCP](MCP_CONTRACT.md),
+[DATA_MODEL](DATA_MODEL.md) i [AUTOMATIONS](AUTOMATIONS.md)):
+
+1. Llistar i cercar projectes. 2. Editar projectes: estat, prioritat, data de revisió.
+3. Tasques amb venciment i prioritat. 4. Notes com a memòria explícita, amb «oblidar» reversible.
+5. Resum d'un projecte en una crida. 6. Les mateixes operacions a l'API HTTP.
+7. Resum diari per regles. 8. Enviament per Telegram amb cron, un missatge al dia com a màxim.
+9. Posposar seguiments d'un projecte. 10. Còpia lògica de projectes, tasques i notes.
+
+13 eines MCP (abans 2), migració 003, cap dependència ni servei nou.
+
+**Verificat el 2026-11-25** (Node 26.13.1, npm 11.20.0, PostgreSQL 17.12 local i temporal,
+instal·lat amb Homebrew per a aquestes proves):
+
+| Ordre | Resultat real | Abast |
+| --- | --- | --- |
+| `npm test` | 52/52 (18 API/MCP, 14 OAuth, 12 domini, 8 operatives) | Regles, validació, aïllament per propietari, resum i Telegram **simulat** |
+| `npm run test:postgres` | 3/3 | SQL real: migracions 001–003 (la 003 sobre projectes ja existents), escenari complet, restriccions, 10 creacions i 10 reclamacions de resum simultànies |
+| `npm run test:ops` | 1/1 | Clúster nou: rols mínims, ledger 001–003, **tot l'escenari amb el rol runtime**, permisos negatius, còpia i restauració completes |
+| `npm run test:worker` | 1/1 | workerd local: 13 eines descobertes pel client oficial |
+| `npm run check`, `npm run build` | Correctes; 1687,56 KiB / gzip 313,00 KiB | Sense desplegar |
+| `npm audit --omit=dev` | 0 vulnerabilitats conegudes | Auditoria de registre |
+| Dates dins de workerd | Dia i hora de Madrid correctes a l'hivern i a l'estiu | Prova puntual amb un Worker de prova |
+| Revisió independent | Cap troballa crítica ni alta; aïllament per propietari intacte | Agent revisor amb proves de concepte sobre PostgreSQL real |
+
+Aquestes dues suites d'integració també passen sobre el codi de D023 ja publicat: queda
+tancat el pendent «no executades» de `oauth_grants` i de les migracions múltiples.
+
+Troballes de la revisió, corregides i amb prova nova: anys fora de rang (0000, 9999) donaven
+503; `SUMMARY_HOUR` de 10 o més no enviava mai a l'hivern (ara només 6, 7 o 8); un timeout de
+Telegram es reintentava i podia duplicar el missatge (ara només es reintenta un rebuig
+explícit); repetir una petició idempotent marcava activitat al projecte; salts de línia en un
+títol podien imitar una secció del resum; caràcters NUL donaven 503; un emoji es podia partir
+en tallar el missatge; moure una tasca només marcava el projecte nou; la restauració no era
+atòmica; el resum d'un altre dia mesurava la inactivitat des d'ara.
+
+**No verificat ni executat:**
+
+- Res desplegat: ni migració 003 a Neon, ni codi nou al Worker, ni cron real.
+- El driver HTTP de Neon amb el SQL nou (provat amb `pg` sobre PostgreSQL local). Es
+  comprova amb `npm run dev:verify-neon` un cop migrat, que ara també exercita tasques,
+  notes, resum de projecte i resum diari.
+- Telegram real (bot, entrega, límits) i els clients Claude reals amb les 13 eines.
+- `scripts/verify-neon.js` ampliat: només comprovada la sintaxi; no executat (token fix caducat).
+
+**Limitacions que cal conèixer:** no es pot fer una còpia amb el codi nou abans d'aplicar la
+migració 003 (la còpia exigeix el ledger complet); el fitxer de còpia antic (format 1) ja no
+es pot restaurar; els instants de la còpia tenen precisió de mil·lisegons; el resum llegeix
+com a màxim 200 tasques, projectes i decisions pendents i avisa si n'hi ha més; sense
+esborrat real ni paginació. Llista completa a [SECURITY_PRIVACY](SECURITY_PRIVACY.md).
 
 ## OAuth amb GitHub (D023) — desplegat i verificat amb Claude web/app i Claude Code
 
@@ -73,12 +140,9 @@ l'ordre equivalent de cada script directament amb `node`):
 **No verificat ni executat:**
 
 - Cap pendent de clients Claude: GitHub, Claude web/app i Claude Code verificats el 2026-11-25.
-- `npm run test:postgres` i `npm run test:ops`: no hi ha PostgreSQL local en aquesta
-  màquina. Les proves noves per a `oauth_grants` i migracions múltiples hi són però
-  **no s'han executat**; `scripts/database-ops.js` i `scripts/db.js` s'han modificat sense
-  aquesta prova d'integració.
+- `npm run test:postgres` i `npm run test:ops` no es van poder executar el 2026-11-24;
+  **executades i correctes el 2026-11-25** amb PostgreSQL local (vegeu D024–D026 a dalt).
 - El driver HTTP de Neon del Worker amb les consultes noves (només s'ha provat el SQL amb `pg`).
-- `npm audit`: sense npm disponible; no s'ha afegit ni actualitzat cap dependència.
 
 Troballes de la revisió, totes amb prova nova: la pàgina de consentiment feia que el
 navegador enviés `Origin: null` (hauria bloquejat el botó); un lladre podia conservar
@@ -235,14 +299,13 @@ La preparació Free, migració, persistència i restauració remotes de l'increm
 han quedat verificades. No cal repetir ops:provision, token, backup o restore:
 aquests scripts rebutgen sobreescriure fitxers o bases ja ocupats.
 
-**Següent pas: proposar i aprovar l'abast de `list_projects`.** La posada en marxa de
-D023 és completa (passos 1–9 de [DEVELOPMENT](DEVELOPMENT.md#autenticació-oauth-amb-github--d023)). Després: mesurar el consum de CPU.
+**Següent pas: posar en marxa D024–D026** seguint
+[DEVELOPMENT](DEVELOPMENT.md): migració 003, deploy, reconnectar clients i validar.
 Publicació inicial autoritzada i executada segons D021. HTTPS i `npm run dev:verify-remote` ja passen.
 No habilitar autodeploy. Les dades personals continuen prohibides.
 Guia i ordres a [DEVELOPMENT](DEVELOPMENT.md). La reconciliació documental i el
-[flux Git](GIT_WORKFLOW.md) estan aprovats; rotació real autoritzada i executada a D022; implementació de
-`list_projects` encara requereix aprovació separada. Sense llistat, un xat nou encara
-necessita conèixer l’UUID del projecte.
+[flux Git](GIT_WORKFLOW.md) estan aprovats; rotació real autoritzada i executada a D022.
+Fins que D024–D026 es publiqui, un xat nou encara necessita conèixer l’UUID del projecte.
 
 ## Objectius futurs
 
@@ -252,6 +315,12 @@ web i proactivitat per Telegram continuen a la [visió](PRODUCT_VISION.md) i el
 
 ## Punt de represa
 
-D023 publicada el 2026-11-24, verificada amb Claude web/app i fusionada a main el
-2026-11-25; Claude Code verificat el mateix dia. Pendent: triar una sola connexió a Jarvis
-dins de Claude Code i aprovar l'abast de `list_projects`.
+D023 publicada, verificada amb Claude web/app i Claude Code i fusionada a main.
+D024–D026 implementades i pujades a la branca `feat/jarvis-core` el 2026-11-25, sense
+desplegar ni fusionar. La branca també conté el registre de la validació de Claude Code
+(`docs/claude-code-validation`), que tampoc és a main.
+
+Pendent de l'usuari, en aquest ordre: migrar (003), desplegar, reconnectar els clients,
+validar amb dades fictícies i, si vol, activar Telegram. Després: política de dades
+personals abans de posar-hi res real, i aprovar l'abast del bloc següent del
+[roadmap](roadmap.md) (universitat i calendari, app web, entrenaments).

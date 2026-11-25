@@ -116,7 +116,7 @@ automàticament sense clau. Restricció SQL i operació atòmica per concurrènc
 ## Proposades, NO decidides
 
 - P001: React PWA (futur).
-- P004: Cron i accés propi a Calendar (futur).
+- P004: accés propi a Calendar (futur). El cron per al resum diari ja està decidit a D025.
 - P005: OAuth per a la futura PWA (ajornat). L'OAuth per a clients MCP ja està decidit a D023.
 
 ## Format per a decisions futures
@@ -266,3 +266,81 @@ a SECURITY_PRIVACY). Canviar `OAUTH_SIGNING_KEY` revoca totes les connexions. El
 queda com a via opcional. Substitueix la restricció «sense OAuth» de D013 i D022.
 Publicar continua sent una acció explícita de l'usuari (login de Wrangler i secrets).
 **Evidència de validació:** proves i límits a [CURRENT_STATE](CURRENT_STATE.md).
+
+
+## D024 — Circuit complet de projectes: tasques i memòria explícita — 2026-11-25
+
+**Estat:** aprovada per l'usuari el 2026-11-25 dins d'una llista de deu increments, amb
+implementació sense interrupcions. **Implementada i provada localment; no desplegada.**
+Publicar, migrar la BD real i fusionar a main continuen requerint l'usuari.
+Evidència a [CURRENT_STATE](CURRENT_STATE.md).
+**Context:** amb només crear i recuperar per UUID, Jarvis no es podia fer servir en el dia a
+dia: no es podia preguntar «quins projectes tinc?» ni guardar pendents o decisions.
+**Decisió:** llistar, cercar i editar projectes (estat, prioritat, data de revisió, posposar);
+tasques amb venciment i prioritat; notes com a memòria explícita (decisió, decisió pendent,
+fet, preferència, nota) amb procedència; resum d'un projecte en una crida. Les mateixes
+operacions per MCP (13 eines) i per l'API HTTP, sobre uns serveis compartits.
+Contractes a [API_CONTRACT](API_CONTRACT.md) i [MCP_CONTRACT](MCP_CONTRACT.md), dades a
+[DATA_MODEL](DATA_MODEL.md).
+**Regles de disseny adoptades:**
+- Res s'esborra: els projectes s'arxiven, les tasques es cancel·len i «oblidar» una nota la
+  desactiva. Evita pèrdues per un error del model i manté el rol runtime sense `DELETE`.
+- Les dates de venciment són dies de calendari (`YYYY-MM-DD`) i «avui» es calcula a
+  Europe/Madrid, no a UTC.
+- Cada escriptura és una sola sentència SQL, atòmica sense transaccions interactives.
+- L'aïllament per propietari s'aplica dues vegades: al filtre de cada consulta i amb una clau
+  forana composta `(project_id, owner_id)` a la BD.
+- Una sola taula `notes` amb un camp `kind` en lloc de taules separades per a decisions,
+  fets i preferències: mateix cicle de vida i mateixa cerca.
+**Alternatives descartades:** esborrat real (irreversible i exigeix una política que encara
+no existeix); dates amb hora i zona per tasca (complexitat sense cas d'ús); cerca semàntica o
+vectorial (no-objectiu de la visió sense un problema mesurat); una eina MCP genèrica de
+consulta (les normes exigeixen eines concretes, sense SQL lliure); un ORM.
+**Conseqüències:** de 2 a 13 eines i tres taules noves; sense paginació real (límit i avís de
+truncament); cerca literal simple; cal reconnectar els clients perquè vegin les eines noves.
+Continua prohibit posar-hi dades personals reals fins que hi hagi política de dades.
+
+## D025 — Resum diari per regles i enviament per Telegram amb cron — 2026-11-25
+
+**Estat:** aprovada el 2026-11-25 a la mateixa llista. **Implementada i provada amb Telegram
+simulat; no desplegada ni provada amb Telegram ni amb el cron reals.** L'activació requereix
+que l'usuari creï un bot i en pugi el token com a secret.
+**Decisió:** un resum diari calculat amb regles transparents i plantilles, sense IA: tasques
+vençudes, d'avui i dels pròxims set dies, i com a màxim tres seguiments de projectes (revisió
+vençuda, decisió pendent, inactivitat segons prioritat). Consultable com a eina i enviable
+per Telegram cada matí amb un Cron Trigger de Cloudflare (un «cron» és una tasca que el
+proveïdor executa sola a hores fixes). Regles a [AUTOMATIONS](AUTOMATIONS.md).
+**Justificació:** és el segon criteri d'èxit de la visió («rebre a Telegram un resum
+programat»); Cron Triggers forma part del pla Free; les regles són explicables i barates.
+**Decisions de detall:**
+- El cron s'expressa en UTC, que no té canvi d'hora: el Worker es desperta quatre cops cada
+  matí i decideix ell si a Madrid ja és l'hora. Evita canviar la configuració dos cops l'any.
+- **Com a màxim un missatge al dia:** un registre a la BD per propietari i dia. Si hi ha un
+  dubte (el Worker mor a mig enviament), no s'envia. Es prefereix perdre un resum a rebre'n dos.
+- Un dia sense res a dir no envia cap missatge.
+- Text pla, a un únic xat configurat, només de sortida: el bot no llegeix ni respon.
+**Alternatives descartades:** resum redactat per un model (cost i dependència, no-objectiu);
+Durable Objects o Queues per garantir l'entrega (serveis nous); un únic cron fix (es desviaria
+una hora mig any); bot bidireccional (obriria una entrada no autenticada cap a les dades).
+**Conseqüències:** els títols de tasques i projectes surten cap a un tercer (Telegram): no
+posar-hi informació sensible. Tres secrets opcionals nous. Calendari i entrenaments encara no
+formen part del resum. Substitueix la part de cron de P004.
+
+## D026 — Còpia lògica format 2 i permisos runtime per columnes — 2026-11-25
+
+**Estat:** aprovada el 2026-11-25 a la mateixa llista. **Implementada i verificada amb
+PostgreSQL 17 local** (`npm run test:ops`); no executada sobre Neon.
+**Decisió:** la còpia lògica passa a cobrir projectes, tasques i notes en fitxers amb data
+que mai es sobreescriuen, i la restauració reconstrueix tot l'esquema en una BD buida. El rol
+runtime rep permisos per columnes: pot inserir i editar camps concrets, però no esborrar
+files, canviar-ne el propietari ni tocar l'esquema.
+**Justificació:** la còpia anterior (D018–D019) només cobria projectes; amb tasques i notes
+hauria deixat fora la major part de les dades. Els permisos per columnes fan que un error de
+codi no pugui moure dades entre propietaris.
+**Alternatives descartades:** `pg_dump` (exigeix eines i credencials més àmplies al dispositiu);
+incloure `oauth_grants` i el registre de resums a la còpia (és estat operatiu: restaurar
+sessions antigues seria un risc); `DELETE` per al runtime.
+**Conseqüències:** el fitxer antic de format 1 ja no es pot restaurar amb aquest codi. Després
+d'una restauració cal tornar a connectar els clients. La còpia continua sent un fitxer local
+en clar: no és una política de còpies per a dades personals.
+
