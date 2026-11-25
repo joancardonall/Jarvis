@@ -42,7 +42,9 @@ per l'usuari; comprovacions fetes per l'agent):
 
 ### Detall de la implementació (abans del desplegament)
 
-Branca `feat/oauth-github` (encara no fusionada a main).
+Branca `feat/oauth-github`, fusionada a main el 2026-11-25 per aprovació de l'usuari
+(fast-forward; abans: `npm test` 39/39, `test:worker` 1/1, `check`, `build` i
+`npm audit --omit=dev` amb 0 vulnerabilitats, ja amb npm instal·lat).
 
 **Implementat:** servidor d'autorització dins del Worker (metadades, registre de clients
 sense estat, consentiment, anada i tornada de GitHub, tokens amb rotació), taula
@@ -229,7 +231,7 @@ aquests scripts rebutgen sobreescriure fitxers o bases ja ocupats.
 
 **Següent pas: connectar Claude Code** (pas 9 de
 [DEVELOPMENT](DEVELOPMENT.md#autenticació-oauth-amb-github--d023)); passos 1–8 fets i
-Claude web/app verificat. Fusionar `feat/oauth-github` a main requereix aprovació de l'usuari. Després: mesurar el consum de CPU.
+Claude web/app verificat. Després: mesurar el consum de CPU.
 Publicació inicial autoritzada i executada segons D021. HTTPS i `npm run dev:verify-remote` ja passen.
 No habilitar autodeploy. Les dades personals continuen prohibides.
 Guia i ordres a [DEVELOPMENT](DEVELOPMENT.md). La reconciliació documental i el
@@ -245,6 +247,5 @@ web i proactivitat per Telegram continuen a la [visió](PRODUCT_VISION.md) i el
 
 ## Punt de represa
 
-D023 publicada el 2026-11-24 des de la branca `feat/oauth-github` (sense fusionar a main)
-i verificada amb Claude web/app el 2026-11-25. Pendent: Claude Code (pas 9), decidir la
-fusió a main i, després, aprovar l'abast de `list_projects`.
+D023 publicada el 2026-11-24, verificada amb Claude web/app i fusionada a main el
+2026-11-25. Pendent: Claude Code (pas 9) i, després, aprovar l'abast de `list_projects`.

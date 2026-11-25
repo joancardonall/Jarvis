@@ -4,13 +4,12 @@
 
 D023 (OAuth 2.1 amb GitHub per als connectors de Claude) està **desplegada** des de la
 branca `feat/oauth-github` i **verificada amb Claude web/app**: crear en un xat i
-recuperar en un altre funciona. Pendent: Claude Code i fusió a main. La mesura de CPU
+recuperar en un altre funciona. Fusionada a main el 2026-11-25. Pendent: Claude Code. La mesura de CPU
 continua pendent.
 
 Ordre proposat per als següents increments:
 
-1. Validar D023 amb Claude Code ([pas 9](DEVELOPMENT.md#autenticació-oauth-amb-github--d023))
-   i fusionar la branca a main amb aprovació.
+1. Validar D023 amb Claude Code ([pas 9](DEVELOPMENT.md#autenticació-oauth-amb-github--d023)).
 2. `list_projects`.
 3. Tasques.
 4. Resum per Telegram.
