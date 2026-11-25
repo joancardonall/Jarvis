@@ -23,9 +23,18 @@ export async function laterMigrations() {
 // Applies every pending migration inside one transaction and records its checksum in a ledger.
 // Repeating the command is safe; a reviewed file that changed after being applied is refused.
 export async function migrate(client) {
-  const definition = await migrationDefinition();
   await client.query('BEGIN');
   try {
+    await applyMigrations(client);
+    await client.query('COMMIT');
+  } catch (error) { await client.query('ROLLBACK'); throw error; }
+}
+
+// The migration steps without transaction control, so a restore can run them and insert the
+// data inside one single transaction.
+async function applyMigrations(client) {
+  const definition = await migrationDefinition();
+  {
     const existing = await client.query("SELECT to_regclass('public.jarvis_migrations') AS ledger, to_regclass('public.projects') AS projects");
     if (existing.rows[0].ledger) {
       const record = await client.query("SELECT sha256 FROM public.jarvis_migrations WHERE version = '001'");
@@ -46,8 +55,7 @@ export async function migrate(client) {
       await client.query(withoutTransaction(migration.sql));
       await client.query('INSERT INTO public.jarvis_migrations(version, sha256) VALUES ($1, $2)', [migration.version, migration.hash]);
     }
-    await client.query('COMMIT');
-  } catch (error) { await client.query('ROLLBACK'); throw error; }
+  }
 }
 
 // Runtime privileges: the application role can read and write rows but never delete them, alter
@@ -113,7 +121,7 @@ function plain(row) {
   return Object.fromEntries(Object.entries(row).map(([name, value]) => {
     if (!(value instanceof Date)) return [name, value];
     return [name, DAY_COLUMNS.includes(name)
-      ? `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}` : value.toISOString()];
+      ? `${String(value.getFullYear()).padStart(4, '0')}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}` : value.toISOString()];
   }));
 }
 
@@ -140,9 +148,10 @@ export async function restoreData(client, snapshot) {
   // Restores are never allowed over existing application or migration state.
   const tables = await client.query("SELECT 1 FROM pg_tables WHERE schemaname NOT IN ('pg_catalog','information_schema') LIMIT 1");
   if (tables.rowCount) throw new Error('restore_database_not_empty');
-  await migrate(client); // full current schema plus ledger, in its own transaction
+  // Schema, ledger and rows in one transaction: a failed restore leaves the database empty again.
   await client.query('BEGIN');
   try {
+    await applyMigrations(client);
     // Table and column names come from the fixed schemas above, never from the snapshot file.
     for (const [table, schema] of Object.entries(TABLES)) {
       const columns = Object.keys(schema.shape);

@@ -58,6 +58,15 @@ export async function exerciseDomainStorage(storage, createProject, owner, stran
   assert.equal(replay.id, wheels.id);
   assert.equal(replay.title, 'Choose wheels');
   assert.equal(replay.request_hash, hash('a'));
+  // A replay records no activity, neither on the original project nor on the one it now names,
+  // and still returns the original row when that project is missing or foreign.
+  assert.equal(time((await storage.get(owner, bike.id)).last_activity_at), time(at(5)));
+  const jobsBefore = time((await storage.get(owner, jobs.id)).last_activity_at);
+  assert.equal((await storage.createTask(task({ project_id: jobs.id }, 'k1'), at(6))).id, wheels.id);
+  assert.equal(time((await storage.get(owner, jobs.id)).last_activity_at), jobsBefore);
+  const foreignBefore = time((await storage.get(stranger, foreign.id)).last_activity_at);
+  assert.equal((await storage.createTask(task({ project_id: foreign.id }, 'k1'), at(6))).id, wheels.id);
+  assert.equal(time((await storage.get(stranger, foreign.id)).last_activity_at), foreignBefore);
   const loose = await storage.createTask(task({ title: 'Loose task', due_date: '2030-01-08' }), at(6));
   const undated = await storage.createTask(task({ title: 'Undated' }), at(6));
   const low = await storage.createTask(task({ title: 'Low same day', due_date: '2030-01-10', priority: 'low' }), at(6));
@@ -89,6 +98,14 @@ export async function exerciseDomainStorage(storage, createProject, owner, stran
   changed = await storage.updateTask(owner, loose.id, { project_id: jobs.id, status: 'cancelled' }, at(9));
   assert.equal(changed.project_id, jobs.id);
   assert.equal(changed.completed_at, null);
+  // Moving a task between projects counts as activity on both.
+  await storage.updateTask(owner, loose.id, { project_id: bike.id }, at(9, 13));
+  assert.equal(time((await storage.get(owner, jobs.id)).last_activity_at), time(at(9, 13)));
+  assert.equal(time((await storage.get(owner, bike.id)).last_activity_at), time(at(9, 13)));
+  await storage.updateTask(owner, loose.id, { project_id: jobs.id }, at(9, 14));
+  // A refused update (foreign target) records nothing anywhere.
+  assert.equal(await storage.updateTask(owner, loose.id, { project_id: foreign.id }, at(9, 15)), undefined);
+  assert.equal(time((await storage.get(owner, jobs.id)).last_activity_at), time(at(9, 14)));
   assert.equal(await storage.updateTask(owner, loose.id, { project_id: foreign.id }, at(9)), undefined);
   assert.equal(await storage.updateTask(stranger, loose.id, { title: 'Stolen' }, at(9)), undefined);
   assert.equal(await storage.updateTask(owner, other.id, { title: 'Stolen' }, at(9)), undefined);
@@ -102,6 +119,7 @@ export async function exerciseDomainStorage(storage, createProject, owner, stran
   const decision = await storage.createNote(note({ project_id: bike.id, kind: 'decision', content: 'Use 28mm tyres', source: 'chat' }, 'n1'), at(10));
   assert.equal(decision.status, 'active');
   assert.equal((await storage.createNote(note({ content: 'Other', request_hash: hash('d') }, 'n1'), at(11))).id, decision.id);
+  assert.equal(time((await storage.get(owner, bike.id)).last_activity_at), time(at(10))); // replay: no activity
   const question = await storage.createNote(note({ project_id: bike.id, kind: 'open_question', content: 'Disc or rim brakes?' }), at(11));
   await storage.createNote(note({ kind: 'preference', content: 'Prefers morning training' }), at(12));
   await storage.createNote(note({ owner_id: stranger, content: 'Stranger tyres note' }), at(12));

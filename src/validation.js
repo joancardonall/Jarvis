@@ -10,12 +10,16 @@ export const uuid = z.string().uuid();
 export const idempotencyKey = z.string().regex(/^[A-Za-z0-9._:-]{1,128}$/);
 export const priority = z.enum(PRIORITIES);
 export const limit = z.number().int().min(1).max(200);
-export const text = max => z.string().max(max);
-export const requiredText = max => z.string().min(1).max(max).refine(value => value.trim().length > 0);
+// PostgreSQL text cannot contain the NUL character; reject it here instead of failing in the database.
+const noNul = value => !value.includes('\u0000');
+export const text = max => z.string().max(max).refine(noNul);
+export const requiredText = max => z.string().min(1).max(max).refine(value => noNul(value) && value.trim().length > 0);
+export const searchText = z.string().min(1).max(100).refine(noNul);
 
 // Calendar date "YYYY-MM-DD" (no time, no time zone): a due date means "that day in Madrid".
 // Impossible dates such as 2026-02-30 are rejected instead of silently rolling over.
-export const calendarDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(value => {
+// Years are limited to 1900-2999: enough for any real use and safe for date arithmetic and storage.
+export const calendarDate = z.string().regex(/^(19|2\d)\d{2}-\d{2}-\d{2}$/).refine(value => {
   const date = new Date(`${value}T00:00:00Z`);
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }, 'invalid_date');
@@ -42,7 +46,7 @@ export function addDays(date, days) {
 export function dateView(value) {
   if (value === null || value === undefined) return null;
   if (value instanceof Date) {
-    return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
+    return `${String(value.getFullYear()).padStart(4, '0')}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
   }
   return String(value).slice(0, 10);
 }

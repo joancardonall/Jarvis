@@ -22,16 +22,19 @@ export const UPDATE_PROJECT = `
   RETURNING *`;
 
 // The project (if any) must belong to the same owner; touching it records activity. When the
-// project is missing or foreign, nothing is inserted and no row is returned.
+// project is missing or foreign, nothing is inserted and no row is returned. A replay of an
+// idempotency key changes nothing at all: it only returns the row created the first time.
 export const CREATE_TASK = `
-  WITH touched AS (
+  WITH replayed AS (
+    SELECT 1 FROM tasks WHERE owner_id = $2::uuid AND idempotency_key = $8::text),
+  touched AS (
     UPDATE projects SET last_activity_at = $10::timestamptz
-    WHERE id = $3::uuid AND owner_id = $2::uuid RETURNING id)
+    WHERE id = $3::uuid AND owner_id = $2::uuid AND NOT EXISTS (SELECT 1 FROM replayed) RETURNING id)
   INSERT INTO tasks (id, owner_id, project_id, title, notes, priority, due_date,
                      idempotency_key, request_hash, created_at, updated_at)
   SELECT $1::uuid, $2::uuid, $3::uuid, $4::text, $5::text, $6::text, $7::date,
          $8::text, $9::text, $10::timestamptz, $10::timestamptz
-  WHERE $3::uuid IS NULL OR EXISTS (SELECT 1 FROM touched)
+  WHERE $3::uuid IS NULL OR EXISTS (SELECT 1 FROM touched) OR EXISTS (SELECT 1 FROM replayed)
   ON CONFLICT (owner_id, idempotency_key) DO UPDATE SET idempotency_key = tasks.idempotency_key
   RETURNING *`;
 
@@ -46,8 +49,11 @@ export const LIST_TASKS = `
   LIMIT $5`;
 
 // completed_at follows the status: set when a task becomes done, cleared when it is reopened.
+// `previous` reads the row as it was before this statement, so a task moved between projects
+// records activity on both the old and the new project.
 export const UPDATE_TASK = `
-  WITH updated AS (
+  WITH previous AS (SELECT project_id FROM tasks WHERE owner_id = $1 AND id = $2),
+  updated AS (
     UPDATE tasks
     SET title = COALESCE($3::text, title), notes = COALESCE($4::text, notes),
         status = COALESCE($5::text, status), priority = COALESCE($6::text, priority),
@@ -62,18 +68,21 @@ export const UPDATE_TASK = `
     RETURNING *),
   touched AS (
     UPDATE projects SET last_activity_at = $11::timestamptz
-    WHERE owner_id = $1 AND id IN (SELECT project_id FROM updated))
+    WHERE owner_id = $1 AND EXISTS (SELECT 1 FROM updated)
+      AND id IN (SELECT project_id FROM updated UNION SELECT project_id FROM previous))
   SELECT * FROM updated`;
 
 export const CREATE_NOTE = `
-  WITH touched AS (
+  WITH replayed AS (
+    SELECT 1 FROM notes WHERE owner_id = $2::uuid AND idempotency_key = $7::text),
+  touched AS (
     UPDATE projects SET last_activity_at = $9::timestamptz
-    WHERE id = $3::uuid AND owner_id = $2::uuid RETURNING id)
+    WHERE id = $3::uuid AND owner_id = $2::uuid AND NOT EXISTS (SELECT 1 FROM replayed) RETURNING id)
   INSERT INTO notes (id, owner_id, project_id, kind, content, source,
                      idempotency_key, request_hash, created_at, updated_at)
   SELECT $1::uuid, $2::uuid, $3::uuid, $4::text, $5::text, $6::text,
          $7::text, $8::text, $9::timestamptz, $9::timestamptz
-  WHERE $3::uuid IS NULL OR EXISTS (SELECT 1 FROM touched)
+  WHERE $3::uuid IS NULL OR EXISTS (SELECT 1 FROM touched) OR EXISTS (SELECT 1 FROM replayed)
   ON CONFLICT (owner_id, idempotency_key) DO UPDATE SET idempotency_key = notes.idempotency_key
   RETURNING *`;
 

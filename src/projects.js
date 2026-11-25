@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { AppError } from './errors.js';
-import { calendarDate, dateView, idempotencyKey, instantView, limit, parse, priority, requiredText, text, uuid }
+import { calendarDate, dateView, idempotencyKey, instantView, limit, parse, priority, requiredText, searchText, text, uuid }
   from './validation.js';
 
 export const PROJECT_STATUSES = ['active', 'paused', 'completed', 'archived'];
@@ -15,7 +15,7 @@ export const projectLookup = z.object({ project_id: uuid }).strict();
 // Without a status filter, archived projects are hidden: they are kept but no longer relevant.
 export const projectListInput = z.object({
   status: z.enum(PROJECT_STATUSES).optional(),
-  query: z.string().min(1).max(100).optional(),
+  query: searchText.optional(),
   limit: limit.optional(),
 }).strict();
 

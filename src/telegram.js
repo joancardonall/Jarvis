@@ -13,15 +13,22 @@ export function telegramSettings(env) {
 
 // Sends plain text (no Markdown/HTML parsing, so stored text can never inject formatting or links
 // with hidden targets). The bot token is part of the URL required by Telegram: never log it.
+// Returns 'sent', 'rejected' (Telegram answered with an error: certainly not delivered) or
+// 'unknown' (no usable answer, for example a timeout: the message may or may not have arrived).
 export async function sendTelegram(settings, text, fetchUpstream) {
-  const body = text.length > MAX_MESSAGE ? `${text.slice(0, MAX_MESSAGE)}\n…` : text;
+  // Cut by whole characters so an emoji is never split in half.
+  const characters = Array.from(text);
+  const body = characters.length > MAX_MESSAGE ? `${characters.slice(0, MAX_MESSAGE).join('')}\n…` : text;
+  let response;
   try {
-    const response = await fetchUpstream(`https://api.telegram.org/bot${settings.token}/sendMessage`, {
+    response = await fetchUpstream(`https://api.telegram.org/bot${settings.token}/sendMessage`, {
       method: 'POST', signal: AbortSignal.timeout(10000), headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ chat_id: settings.chat, text: body, disable_web_page_preview: true }),
     });
-    return response.ok && (await response.json())?.ok === true;
-  } catch { return false; }
+  } catch { return 'unknown'; }
+  if (!response.ok) return 'rejected';
+  try { return (await response.json())?.ok === true ? 'sent' : 'rejected'; }
+  catch { return 'unknown'; }
 }
 
 // On-demand delivery (tool or API): sends today's summary now, outside the once-a-day ledger.
@@ -29,7 +36,7 @@ export async function sendSummaryNow(env, summaryService, owner, fetchUpstream) 
   const settings = telegramSettings(env);
   if (!settings) throw new AppError(503, 'telegram_not_configured');
   const summary = await summaryService.daily(owner);
-  if (!await sendTelegram(settings, summary.text, fetchUpstream)) throw new AppError(502, 'telegram_failed');
+  if (await sendTelegram(settings, summary.text, fetchUpstream) !== 'sent') throw new AppError(502, 'telegram_failed');
   return { sent: true, date: summary.date };
 }
 
@@ -37,22 +44,26 @@ export function madridHour(now) {
   return Number(new Intl.DateTimeFormat('en-GB', { timeZone: TIME_ZONE, hour: '2-digit', hourCycle: 'h23' }).format(new Date(now)));
 }
 
-// Scheduled delivery. The cron fires several times each morning (UTC has no daylight saving);
-// the ledger row for (owner, day) guarantees one message at most, and a failed send is retried
-// by a later firing. A day with nothing to report is recorded as skipped: no noise.
+// Scheduled delivery. The cron fires at 05:30-08:30 UTC (UTC has no daylight saving), that is
+// 06:30-09:30 in Madrid in winter and 07:30-10:30 in summer. SUMMARY_HOUR may be 6, 7 or 8 so that
+// several firings always remain for retries; any other value means 7.
+// The ledger row for (owner, day) guarantees one message at most. Only a send that Telegram
+// explicitly rejected is retried by a later firing; when the outcome is unknown nothing is resent,
+// because a missing summary is preferred to a duplicate. A day with nothing to report is skipped.
 export async function runScheduledSummary(env, repository, summaryService, { fetchUpstream, now }) {
   const settings = telegramSettings(env);
   if (!settings || !UUID.test(env.DEV_OWNER_ID ?? '')) return 'not_configured';
-  const hour = /^([0-9]|1[0-9]|2[0-3])$/.test(env.SUMMARY_HOUR ?? '') ? Number(env.SUMMARY_HOUR) : 7;
+  const hour = /^[678]$/.test(env.SUMMARY_HOUR ?? '') ? Number(env.SUMMARY_HOUR) : 7;
   if (madridHour(now) < hour) return 'too_early';
   const owner = env.DEV_OWNER_ID;
   const date = madridDate(now);
   // Claim before reading anything else: later firings of the same morning stop here.
   if (!await repository.claimSummary(owner, date, new Date(now))) return 'already_handled';
-  let status = 'failed';
+  let status = 'failed'; // nothing was sent yet if building the summary throws: safe to retry
   try {
     const summary = await summaryService.daily(owner, { date });
-    status = summary.is_empty ? 'skipped' : (await sendTelegram(settings, summary.text, fetchUpstream) ? 'sent' : 'failed');
+    const outcome = summary.is_empty ? 'skipped' : await sendTelegram(settings, summary.text, fetchUpstream);
+    status = outcome === 'rejected' ? 'failed' : outcome;
   } finally {
     await repository.finishSummary(owner, date, status, new Date(now));
   }

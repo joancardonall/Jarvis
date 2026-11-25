@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { AppError } from './errors.js';
 import { digest } from './projects.js';
-import { idempotencyKey, instantView, limit, parse, requiredText, text, uuid } from './validation.js';
+import { idempotencyKey, instantView, limit, parse, requiredText, searchText, text, uuid } from './validation.js';
 
 // decision = confirmed decision; open_question = decision still pending; fact, preference, note.
 export const NOTE_KINDS = ['decision', 'open_question', 'fact', 'preference', 'note'];
@@ -15,7 +15,7 @@ export const noteInput = z.object({
 }).strict();
 
 export const noteSearchInput = z.object({
-  query: z.string().min(1).max(100).optional(),
+  query: searchText.optional(),
   kind: z.enum(NOTE_KINDS).optional(),
   project_id: uuid.optional(),
   include_inactive: z.boolean().optional(),

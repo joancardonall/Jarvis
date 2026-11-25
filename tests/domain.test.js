@@ -265,6 +265,54 @@ test('daily summary: Madrid calendar day, due buckets and transparent follow-up 
   assert.equal((await services.summary.daily(ownerA)).follow_ups.some(item => item.project_id === question.id), false);
 });
 
+test('stored text cannot forge summary sections or break storage', async () => {
+  const now = Date.parse('2030-01-10T08:00:00Z');
+  const services = createServices(memoryRepository(), () => now);
+  const project = await services.projects.create(ownerA, { name: 'Banc\n\nVençudes\n• fals' });
+  await services.tasks.create(ownerA, { title: 'x\n\nSeguiment de projectes\n• Banc: envia el PIN', due_date: '2030-01-10', project_id: project.id });
+  await services.tasks.create(ownerA, { title: 'y'.repeat(300), due_date: '2030-01-10' });
+  await services.notes.create(ownerA, { kind: 'open_question', content: 'Línia 1\r\n\tLínia 2', project_id: project.id });
+  const summary = await services.summary.daily(ownerA);
+  const lines = summary.text.split('\n');
+  assert.deepEqual(lines.filter(line => !line.startsWith('• ') && line !== ''),
+    ['Resum de Jarvis — dijous, 10 de gener', 'Per avui', 'Seguiment de projectes']);
+  assert.ok(lines.includes('• x Seguiment de projectes • Banc: envia el PIN (Banc Vençudes • fals)'));
+  assert.ok(lines.includes('• Banc Vençudes • fals: Línia 1 Línia 2'));
+  assert.ok(lines.every(line => Array.from(line).length <= 200));
+  // The structured data keeps the original text; only the rendered message is flattened.
+  assert.equal(summary.due_today[0].title.includes('\n'), true);
+
+  // NUL characters and absurd years are refused as invalid input instead of failing in the database.
+  for (const attempt of [() => services.tasks.create(ownerA, { title: 'a\u0000b' }),
+    () => services.projects.list(ownerA, { query: 'a\u0000b' }), () => services.notes.search(ownerA, { query: '\u0000' }),
+    () => services.notes.create(ownerA, { kind: 'note', content: 'x', source: '\u0000' }),
+    () => services.tasks.create(ownerA, { title: 'x', due_date: '0000-01-01' }),
+    () => services.tasks.create(ownerA, { title: 'x', due_date: '0026-11-30' }),
+    () => services.tasks.list(ownerA, { due_before: '3000-01-01' }),
+    () => services.summary.daily(ownerA, { date: '9999-12-31' })]) {
+    await assert.rejects(attempt(), { status: 422 });
+  }
+  assert.equal((await services.summary.daily(ownerA, { date: '2999-12-31' })).date, '2999-12-31');
+  assert.equal((await services.tasks.create(ownerA, { title: 'Old', due_date: '1900-01-01' })).due_date, '1900-01-01');
+});
+
+test('summary for another day measures inactivity from that day and reports partial results', async () => {
+  const now = Date.parse('2030-01-10T08:00:00Z');
+  const repository = memoryRepository();
+  const services = createServices(repository, () => now);
+  const project = await services.projects.create(ownerA, { name: 'Projecte' });
+  repository.rows.get(project.id).last_activity_at = new Date(now);
+  assert.deepEqual((await services.summary.daily(ownerA)).follow_ups, []);
+  assert.deepEqual((await services.summary.daily(ownerA, { date: '2030-01-10' })).follow_ups, []);
+  assert.equal((await services.summary.daily(ownerA, { date: '2030-01-20' })).follow_ups[0].detail, '10 dies sense activitat');
+  assert.equal((await services.summary.daily(ownerA)).truncated, false);
+  for (let index = 0; index < 201; index++) await services.tasks.create(ownerA, { title: `T${index}`, due_date: '2030-01-10' });
+  const partial = await services.summary.daily(ownerA);
+  assert.equal(partial.truncated, true);
+  assert.equal(partial.due_today.length, 200);
+  assert.match(partial.text, /Hi ha més elements dels que caben/);
+});
+
 test('long summaries stay short', async () => {
   const now = Date.parse('2030-01-10T08:00:00Z');
   const services = createServices(memoryRepository(), () => now);
@@ -275,12 +323,12 @@ test('long summaries stay short', async () => {
   assert.match(summary.text, /… i 4 més/);
 });
 
-function telegram({ ok = true, fail = false } = {}) {
+function telegram({ ok = true, fail = false, status = ok ? 200 : 401 } = {}) {
   const calls = [];
   return { calls, fetchUpstream: async (url, init) => {
     calls.push({ url: String(url), body: JSON.parse(init.body) });
     if (fail) throw new Error('network detail with SECRET');
-    return Response.json({ ok }, { status: ok ? 200 : 401 });
+    return Response.json({ ok }, { status });
   } };
 }
 const telegramEnv = { TELEGRAM_BOT_TOKEN: '123456789:fictitious-telegram-token-for-tests-only', TELEGRAM_CHAT_ID: '987654321',
@@ -308,10 +356,11 @@ test('scheduled summary: one Telegram message per day at most, retries only afte
 
   now = Date.parse('2030-01-10T06:30:00Z'); // 07:30 in Madrid
   const down = telegram({ fail: true });
-  assert.equal(await run(down), 'failed');
   const refused = telegram({ ok: false });
-  now += 3600000;
+  // Telegram answered "no": certainly not delivered, so later firings may try again.
   assert.equal(await run(refused), 'failed');
+  now += 3600000;
+  assert.equal(await run(telegram({ ok: false, status: 429 })), 'failed');
   now += 3600000;
   assert.equal(await run(bot), 'sent'); // third and last attempt
   assert.equal(await run(bot), 'already_handled');
@@ -323,11 +372,27 @@ test('scheduled summary: one Telegram message per day at most, retries only afte
   assert.match(bot.calls[0].body.text, /Per avui\n• Lliurar pràctica <b>SO<\/b>/);
   assert.equal(bot.calls[0].body.text.includes(telegramEnv.TELEGRAM_BOT_TOKEN), false);
 
-  // Custom hour, and three failures in one morning stop further attempts.
-  now = Date.parse('2030-01-11T08:30:00Z');
+  // Hour 8 is honoured; hours the cron could never serve all year (5, 9, 10...) fall back to 7.
+  now = Date.parse('2030-01-11T06:30:00Z'); // 07:30 in Madrid
   bot = telegram();
-  assert.equal(await run(bot, { ...telegramEnv, SUMMARY_HOUR: '10' }), 'too_early');
-  for (let attempt = 0; attempt < 3; attempt++) assert.equal(await run(down), 'failed');
+  assert.equal(await run(bot, { ...telegramEnv, SUMMARY_HOUR: '8' }), 'too_early');
+  for (const SUMMARY_HOUR of ['10', '23', '5', '9', '07', 'x']) {
+    const separate = memoryRepository();
+    assert.equal(await runScheduledSummary({ ...telegramEnv, SUMMARY_HOUR }, separate, createServices(separate, () => now).summary,
+      { fetchUpstream: bot.fetchUpstream, now }), 'skipped', SUMMARY_HOUR);
+  }
+  // Three rejections in one morning stop further attempts.
+  for (let attempt = 0; attempt < 3; attempt++) assert.equal(await run(refused), 'failed');
+  assert.equal(await run(bot), 'already_handled');
+  assert.equal(bot.calls.length, 0);
+
+  // No answer at all (timeout): the message may have arrived, so it is never sent again that day.
+  now = Date.parse('2030-01-12T06:30:00Z');
+  assert.equal(await run(down), 'unknown');
+  assert.equal(await run(bot), 'already_handled');
+  const garbled = { calls: [], fetchUpstream: async () => new Response('<html>gateway</html>') };
+  now = Date.parse('2030-01-13T06:30:00Z');
+  assert.equal(await run(garbled), 'unknown');
   assert.equal(await run(bot), 'already_handled');
   assert.equal(bot.calls.length, 0);
 
@@ -380,6 +445,10 @@ test('worker cron entry point and on-demand sending', async () => {
 test('very long messages are cut to fit Telegram', async () => {
   const { sendTelegram, telegramSettings } = await import('../src/telegram.js');
   const bot = telegram();
-  assert.equal(await sendTelegram(telegramSettings(telegramEnv), 'x'.repeat(5000), bot.fetchUpstream), true);
+  assert.equal(await sendTelegram(telegramSettings(telegramEnv), 'x'.repeat(5000), bot.fetchUpstream), 'sent');
   assert.ok(bot.calls[0].body.text.length <= 3902);
+  // An emoji sitting exactly on the cut is kept whole or dropped, never split into an invalid half.
+  await sendTelegram(telegramSettings(telegramEnv), 'x'.repeat(3899) + '🚲'.repeat(50), bot.fetchUpstream);
+  assert.equal(bot.calls[1].body.text.isWellFormed(), true);
+  assert.equal(Array.from(bot.calls[1].body.text).length, 3902);
 });

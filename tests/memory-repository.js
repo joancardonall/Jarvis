@@ -12,11 +12,11 @@ export function memoryRepository() {
   };
   // Shared by tasks and notes: owner-checked project, idempotent replay, then insert.
   const insertItem = (list, item, defaults, now) => {
-    if (item.project_id && rows.get(item.project_id)?.owner_id !== item.owner_id) return undefined;
-    touch(item.owner_id, item.project_id, now);
     const existing = item.idempotency_key && list.find(candidate =>
       candidate.owner_id === item.owner_id && candidate.idempotency_key === item.idempotency_key);
-    if (existing) return existing;
+    if (existing) return existing; // a replay changes nothing, not even project activity
+    if (item.project_id && rows.get(item.project_id)?.owner_id !== item.owner_id) return undefined;
+    touch(item.owner_id, item.project_id, now);
     const row = { ...item, ...defaults, created_at: now, updated_at: now };
     list.push(row);
     return row;
@@ -117,6 +117,7 @@ export function memoryRepository() {
       const task = tasks.find(candidate => candidate.id === id && candidate.owner_id === owner);
       if (!task) return undefined;
       if (changes.project_id && rows.get(changes.project_id)?.owner_id !== owner) return undefined;
+      touch(owner, task.project_id, now); // the project it is leaving, if it moves
       for (const field of ['title', 'notes', 'status', 'priority']) if (changes[field] != null) task[field] = changes[field];
       for (const field of ['due_date', 'project_id']) if (Object.hasOwn(changes, field)) task[field] = changes[field];
       task.completed_at = task.status === 'done' ? task.completed_at ?? now : null;

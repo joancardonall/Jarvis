@@ -47,6 +47,30 @@ await runSafely(async () => {
     const fresh = await send(new Request(`${base}/api/v1/projects/${second.id}`, { headers }));
     assert.equal(fresh.status, 200);
     assert.deepEqual(await fresh.json(), second);
+
+    // Tasks, notes, overview and summary through the real Neon HTTP driver. Stable idempotency
+    // keys make this proof repeatable: running it again finds the same synthetic rows.
+    const tool = async (name, args) => {
+      const outcome = await client.callTool({ name: `jarvis.${name}`, arguments: args });
+      assert.ok(!outcome.isError, `${name}: ${outcome.content?.[0]?.text}`);
+      return outcome.structuredContent;
+    };
+    assert.ok((await tool('list_projects', { query: 'Synthetic Neon API proof' })).projects.some(project => project.id === first.id));
+    const task = await tool('create_task', { title: 'Synthetic Neon task proof', project_id: first.id,
+      due_date: '2030-01-15', idempotency_key: 'jarvis-neon-task-proof' });
+    assert.equal(task.due_date, '2030-01-15');
+    assert.equal((await tool('update_task', { task_id: task.id, priority: 'high', status: 'open' })).priority, 'high');
+    const note = await tool('save_note', { kind: 'decision', content: 'Synthetic Neon note proof', project_id: first.id,
+      source: 'verify-neon', idempotency_key: 'jarvis-neon-note-proof' });
+    assert.ok((await tool('search_notes', { query: 'neon note proof' })).notes.some(found => found.id === note.id));
+    const overview = await tool('get_project_overview', { project_id: first.id });
+    assert.ok(overview.open_tasks.some(found => found.id === task.id));
+    assert.ok(overview.notes.some(found => found.id === note.id));
+    assert.ok((await tool('get_daily_summary', { date: '2030-01-15' })).due_today.some(found => found.id === task.id));
+    assert.equal((await tool('update_project', { project_id: first.id, priority: 'normal' })).id, first.id);
+    const listed = await send(new Request(`${base}/api/v1/tasks?project_id=${first.id}`, { headers }));
+    assert.equal(listed.status, 200);
+    assert.ok((await listed.json()).tasks.some(found => found.id === task.id));
   } finally { await client.close(); }
   console.log(useRemote
     ? 'Remote HTTPS, authentication, Origin, MCP discovery, API/MCP cross-read and Neon persistence verified. Synthetic data only.'

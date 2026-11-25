@@ -14,5 +14,5 @@ GITHUB_CLIENT_SECRET="REPLACE_WITH_GITHUB_OAUTH_APP_CLIENT_SECRET"
 # Optional daily summary by Telegram (D025). Leave unset to disable sending.
 # TELEGRAM_BOT_TOKEN="REPLACE_WITH_TOKEN_FROM_BOTFATHER"
 # TELEGRAM_CHAT_ID="REPLACE_WITH_YOUR_NUMERIC_CHAT_ID"
-# Hour of the day in Europe/Madrid from which the summary is sent (default 7).
+# Hour of the day in Europe/Madrid from which the summary is sent: 6, 7 or 8 (default 7).
 # SUMMARY_HOUR="7"

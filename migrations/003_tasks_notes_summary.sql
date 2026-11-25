@@ -55,11 +55,12 @@ CREATE TABLE notes (
 CREATE INDEX notes_owner_status ON notes (owner_id, status, kind);
 
 -- One row per owner and day: guarantees at most one daily summary sent, even if the
--- scheduler fires twice. A failed attempt can be claimed again.
+-- scheduler fires twice. A failed attempt (rejected by Telegram) can be claimed again;
+-- 'unknown' (no answer: it may have arrived) and a stale 'sending' are never retried.
 CREATE TABLE summary_runs (
     owner_id uuid NOT NULL,
     summary_date date NOT NULL,
-    status text NOT NULL CHECK (status IN ('sending', 'sent', 'skipped', 'failed')),
+    status text NOT NULL CHECK (status IN ('sending', 'sent', 'skipped', 'failed', 'unknown')),
     attempts integer NOT NULL DEFAULT 1 CHECK (attempts > 0),
     updated_at timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (owner_id, summary_date)
