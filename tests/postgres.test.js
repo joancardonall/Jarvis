@@ -123,6 +123,7 @@ test('real PostgreSQL: migration 003 keeps existing projects; tasks, notes and s
     const legacy = (await run(CREATE_PROJECT, [crypto.randomUUID(), ownerB, 'Legacy project', '', null, 'a'.repeat(64)]))[0];
     await pool.query("UPDATE projects SET updated_at = '2029-12-01T10:00:00Z' WHERE id = $1", [legacy.id]);
     await pool.query(await sql('003_tasks_notes_summary.sql'));
+    await pool.query(await sql('004_courses.sql'));
     const migrated = (await run(GET_PROJECT, [ownerB, legacy.id]))[0];
     assert.equal(migrated.priority, 'normal');
     assert.equal(migrated.status, 'active');
@@ -147,6 +148,18 @@ test('real PostgreSQL: migration 003 keeps existing projects; tasks, notes and s
     await assert.rejects(pool.query("UPDATE projects SET status = 'deleted'"), { code: '23514' });
     await assert.rejects(pool.query("UPDATE projects SET priority = 'urgent'"), { code: '23514' });
     await assert.rejects(pool.query("UPDATE tasks SET title = '  '"), { code: '23514' });
+    const foreignCourse = await storage.createCourse({ id: crypto.randomUUID(), owner_id: ownerB, name: 'Constraint course',
+      code: '', term: '', notes: '', idempotency_key: null, request_hash: 'a'.repeat(64) }, new Date());
+    await assert.rejects(pool.query(`INSERT INTO tasks (id, owner_id, course_id, title, request_hash)
+      VALUES ($1, $2, $3, 'Cross owner', $4)`, [crypto.randomUUID(), ownerA, foreignCourse.id, 'a'.repeat(64)]), { code: '23503' });
+    await assert.rejects(pool.query(`INSERT INTO course_groups (id, owner_id, course_id, kind)
+      VALUES ($1, $2, $3, 'lab')`, [crypto.randomUUID(), ownerA, foreignCourse.id]), { code: '23503' });
+    await assert.rejects(pool.query("UPDATE courses SET status = 'deleted'"), { code: '23514' });
+    await assert.rejects(pool.query("UPDATE course_groups SET kind = 'party'"), { code: '23514' });
+    // Ten simultaneous saves of the same group leave exactly one row.
+    await Promise.all(Array.from({ length: 10 }, (_, index) => storage.saveCourseGroup({ id: crypto.randomUUID(), owner_id: ownerB,
+      course_id: foreignCourse.id, kind: 'lab', label: 'L9', teacher: `Teacher ${index}` }, new Date())));
+    assert.equal((await pool.query("SELECT count(*) FROM course_groups WHERE label = 'L9'")).rows[0].count, '1');
 
     // Ten simultaneous creations with one idempotency key produce a single task.
     const key = 'concurrent-task';

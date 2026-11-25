@@ -60,7 +60,9 @@ function section(title, lines) {
 
 // Plain text built from templates. Everything in it comes from stored data.
 function render(summary) {
-  const task = (item, withDate) => shorten(item.title, 120) + (item.project_name ? ` (${shorten(item.project_name, 60)})` : '') +
+  // A deliverable shows its course; any other task shows its project.
+  const context = item => item.course_name ?? item.project_name;
+  const task = (item, withDate) => shorten(item.title, 120) + (context(item) ? ` (${shorten(context(item), 60)})` : '') +
     (withDate ? ` — ${item.due_date}` : '');
   const lines = [`Resum de Jarvis — ${longDate(summary.date)}`,
     ...section('Vençudes', summary.overdue.map(item => task(item, true))),
@@ -79,17 +81,20 @@ export function createSummaryService(repository, clock = Date.now) {
       const today = requested ?? madridDate(clock());
       // For another day, inactivity is measured from noon of that day instead of from this instant.
       const now = requested && requested !== madridDate(clock()) ? Date.parse(`${requested}T12:00:00Z`) : clock();
-      const [tasks, projects, questions] = await Promise.all([
+      const [tasks, projects, questions, courses] = await Promise.all([
         repository.listTasks(owner, { project_id: null, status: 'open', due_before: addDays(today, 7), limit: FETCH + 1 }),
         repository.listProjects(owner, { status: null, query: null, limit: FETCH + 1 }),
         repository.searchNotes(owner, { query: null, kind: 'open_question', project_id: null, include_inactive: false, limit: FETCH + 1 }),
+        repository.listCourses(owner, { status: 'active', query: null, limit: FETCH }),
       ]);
       // Beyond FETCH rows the summary is knowingly partial and says so.
       const truncated = [tasks, projects, questions].some(rows => rows.length > FETCH);
       for (const rows of [tasks, projects, questions]) rows.length = Math.min(rows.length, FETCH);
       const names = new Map(projects.map(project => [project.id, project.name]));
+      const courseNames = new Map(courses.map(course => [course.id, course.name]));
       const view = task => ({ id: task.id, title: task.title, due_date: dateView(task.due_date), priority: task.priority,
-        project_id: task.project_id ?? null, project_name: names.get(task.project_id) ?? null });
+        project_id: task.project_id ?? null, project_name: names.get(task.project_id) ?? null,
+        course_id: task.course_id ?? null, course_name: courseNames.get(task.course_id) ?? null });
       const dated = tasks.map(view);
       const summary = {
         date: today, time_zone: TIME_ZONE,

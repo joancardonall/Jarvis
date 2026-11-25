@@ -27,7 +27,7 @@ test('a new conversation can find, resume and change a project without knowing a
   const first = await api.connect();
   let bikeId;
   try {
-    assert.equal((await first.listTools()).tools.length, 13);
+    assert.equal((await first.listTools()).tools.length, 19);
     const bike = await call(first, 'create_project', { name: 'Muntar la bici', description: 'Comparar rodes i transmissió' });
     bikeId = bike.id;
     assert.equal(bike.priority, 'normal');
@@ -189,6 +189,130 @@ test('owners never see or change each other\'s projects, tasks or notes', async 
     assert.equal((await call(a, 'get_project_overview', { project_id: project.id })).open_tasks.length, 1);
     assert.equal((await call(a, 'get_project', { project_id: project.id })).name, 'Private A');
   } finally { await a.close(); await b.close(); }
+});
+
+test('university: courses, groups with teachers, deliverables and academic context', async () => {
+  const now = Date.parse('2030-03-10T09:00:00Z');
+  const repository = memoryRepository();
+  const api = await setup(repository, ownerA, { clock: () => now });
+  api.env.DEV_TOKEN_EXPIRES_AT = '2040-01-01T00:00:00Z';
+  const client = await api.connect();
+  let courseId;
+  try {
+    const course = await call(client, 'create_course', { name: 'Sistemes Operatius', code: 'SO', term: '2029-30 T2', idempotency_key: 'so' });
+    courseId = course.id;
+    assert.equal((await call(client, 'create_course', { name: 'Sistemes Operatius', code: 'SO', term: '2029-30 T2', idempotency_key: 'so' })).id, course.id);
+    assert.deepEqual(await call(client, 'create_course', { name: 'Altres', idempotency_key: 'so' }), { error: 'idempotency_conflict' });
+    await call(client, 'create_course', { name: 'Àlgebra' });
+    // "Who teaches the seminar of X?" (UC-05)
+    await call(client, 'save_course_group', { course_id: course.id, kind: 'theory', label: 'T1', teacher: 'Dra. Fictícia', schedule: 'dl 10-12' });
+    const seminar = await call(client, 'save_course_group', { course_id: course.id, kind: 'seminar', label: 'S102', teacher: 'Dr. Inventat' });
+    // Saving the same group again updates only the given fields and creates no duplicate.
+    const moved = await call(client, 'save_course_group', { course_id: course.id, kind: 'seminar', label: 'S102', location: 'Aula 52.119' });
+    assert.equal(moved.id, seminar.id);
+    assert.equal(moved.teacher, 'Dr. Inventat');
+    assert.equal(moved.location, 'Aula 52.119');
+    const found = await call(client, 'list_courses', { query: 'operatius' });
+    assert.equal(found.courses.length, 1);
+    assert.deepEqual(found.courses[0].groups.map(group => [group.kind, group.label, group.teacher]),
+      [['theory', 'T1', 'Dra. Fictícia'], ['seminar', 'S102', 'Dr. Inventat']]);
+    assert.deepEqual((await call(client, 'list_courses')).courses.map(item => item.name), ['Àlgebra', 'Sistemes Operatius']);
+    // "A lab assignment for the 20th" (UC-04): a deliverable is a task of the course.
+    const lab = await call(client, 'create_task', { title: 'Pràctica 2', course_id: course.id, due_date: '2030-03-20' });
+    assert.equal(lab.course_id, course.id);
+    await call(client, 'create_task', { title: 'Tasca sense assignatura', due_date: '2030-03-12' });
+    await call(client, 'save_note', { kind: 'fact', content: 'L\'examen final val el 40%', course_id: course.id });
+    assert.deepEqual((await call(client, 'list_tasks', { course_id: course.id })).tasks.map(task => task.title), ['Pràctica 2']);
+    assert.equal((await call(client, 'search_notes', { course_id: course.id })).notes.length, 1);
+    const overview = await call(client, 'get_course_overview', { course_id: course.id });
+    assert.equal(overview.course.groups.length, 2);
+    assert.deepEqual(overview.open_tasks.map(task => task.title), ['Pràctica 2']);
+    assert.equal(overview.notes[0].content, 'L\'examen final val el 40%');
+    // The deliverable appears in the daily summary with its course name.
+    const summary = await call(client, 'get_daily_summary', { date: '2030-03-14' });
+    assert.deepEqual(summary.due_this_week.map(task => [task.title, task.course_name]), [['Pràctica 2', 'Sistemes Operatius']]);
+    assert.match(summary.text, /• Pràctica 2 \(Sistemes Operatius\) — 2030-03-20/);
+    // Hiding a group, moving a task out of the course, archiving the course.
+    await call(client, 'save_course_group', { course_id: course.id, kind: 'theory', label: 'T1', status: 'inactive' });
+    assert.equal((await call(client, 'get_course_overview', { course_id: course.id })).course.groups.length, 1);
+    assert.equal((await call(client, 'update_task', { task_id: lab.id, course_id: null })).course_id, null);
+    assert.equal((await call(client, 'update_task', { task_id: lab.id, course_id: course.id })).course_id, course.id);
+    assert.equal((await call(client, 'update_course', { course_id: course.id, status: 'archived' })).status, 'archived');
+    assert.deepEqual((await call(client, 'list_courses')).courses.map(item => item.name), ['Àlgebra']);
+    assert.equal((await call(client, 'list_courses', { status: 'archived' })).courses.length, 1);
+
+    const missing = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+    for (const [name, args, code] of [
+      ['create_task', { title: 'x', course_id: missing }, 'course_not_found'],
+      ['save_note', { kind: 'note', content: 'x', course_id: missing }, 'course_not_found'],
+      ['update_task', { task_id: lab.id, course_id: missing }, 'course_not_found'],
+      ['update_task', { task_id: missing, course_id: course.id }, 'task_not_found'],
+      ['save_course_group', { course_id: missing, kind: 'lab' }, 'course_not_found'],
+      ['update_course', { course_id: missing, name: 'x' }, 'course_not_found'],
+      ['get_course_overview', { course_id: missing }, 'course_not_found'],
+    ]) assert.deepEqual(await call(client, name, args), { error: code });
+    for (const [name, args] of [['create_course', { name: ' ' }], ['save_course_group', { course_id: course.id, kind: 'party' }],
+      ['update_course', { course_id: course.id }], ['update_course', { course_id: course.id, status: 'deleted' }],
+      ['create_course', { name: 'x', owner_id: ownerB }]]) {
+      assert.ok((await client.callTool({ name: `jarvis.${name}`, arguments: args })).isError, name);
+    }
+  } finally { await client.close(); }
+
+  // Another owner sees nothing and can attach nothing to this course.
+  const other = await (await setup(repository, ownerB)).connect();
+  try {
+    assert.deepEqual((await call(other, 'list_courses', { status: 'archived' })).courses, []);
+    for (const [name, args] of [['get_course_overview', { course_id: courseId }], ['update_course', { course_id: courseId, name: 'Taken' }],
+      ['save_course_group', { course_id: courseId, kind: 'lab', teacher: 'Injected' }],
+      ['create_task', { title: 'Injected', course_id: courseId }], ['save_note', { kind: 'note', content: 'Injected', course_id: courseId }]]) {
+      assert.deepEqual(await call(other, name, args), { error: 'course_not_found' });
+    }
+    assert.equal(repository.groups.length, 2);
+  } finally { await other.close(); }
+
+  // HTTP API: same operations.
+  const created = await json(await api.request('/api/v1/courses', { body: { name: 'Xarxes' }, headers: { 'Idempotency-Key': 'xarxes' } }));
+  assert.equal(created.status, 201);
+  const group = await json(await api.request(`/api/v1/courses/${created.body.id}/groups`, { method: 'PUT', body: { kind: 'lab', label: 'L1', teacher: 'Synthetic' } }));
+  assert.deepEqual([group.status, group.body.teacher], [200, 'Synthetic']);
+  assert.equal((await json(await api.request('/api/v1/courses?query=xarx'))).body.courses[0].groups.length, 1);
+  assert.equal((await json(await patch(api, `/api/v1/courses/${created.body.id}`, { term: 'T3' }))).body.term, 'T3');
+  assert.equal((await json(await api.request(`/api/v1/courses/${created.body.id}/overview`))).body.course.name, 'Xarxes');
+  assert.equal((await api.request('/api/v1/courses?status=deleted')).status, 422);
+});
+
+test('export returns everything about the owner, and only about the owner', async () => {
+  const now = Date.parse('2030-03-10T09:00:00Z');
+  const repository = memoryRepository();
+  const services = createServices(repository, () => now);
+  const project = await services.projects.create(ownerA, { name: 'Projecte' });
+  const course = await services.courses.create(ownerA, { name: 'Assignatura' });
+  await services.courses.saveGroup(ownerA, { course_id: course.id, kind: 'theory', teacher: 'Synthetic' });
+  const task = await services.tasks.create(ownerA, { title: 'Cancel·lada', project_id: project.id });
+  await services.tasks.update(ownerA, { task_id: task.id, status: 'cancelled' });
+  const note = await services.notes.create(ownerA, { kind: 'preference', content: 'Oblidada', course_id: course.id });
+  await services.notes.update(ownerA, { note_id: note.id, status: 'inactive' });
+  await services.projects.update(ownerA, { project_id: project.id, status: 'archived' });
+  await services.projects.create(ownerB, { name: 'Aliè' });
+  await services.notes.create(ownerB, { kind: 'note', content: 'Aliena' });
+
+  const exported = await services.exportData(ownerA);
+  assert.equal(exported.exported_at, '2030-03-10T09:00:00.000Z');
+  assert.equal(exported.truncated, false);
+  // Discarded items are included: an export is the complete picture, not the working view.
+  assert.deepEqual([exported.projects[0].status, exported.tasks[0].status, exported.notes[0].status], ['archived', 'cancelled', 'inactive']);
+  assert.deepEqual([exported.projects.length, exported.tasks.length, exported.notes.length, exported.courses.length, exported.course_groups.length], [1, 1, 1, 1, 1]);
+  assert.equal(JSON.stringify(exported).includes('Ali'), false);
+  for (const forbidden of ['owner_id', 'request_hash', 'idempotency_key']) assert.equal(JSON.stringify(exported).includes(forbidden), false);
+  const other = await services.exportData(ownerB);
+  assert.deepEqual([other.projects.length, other.notes.length, other.courses.length], [1, 1, 0]);
+  await assert.rejects(repository.exportTable(ownerA, 'oauth_grants', 10));
+  // Over HTTP and as a read-only tool.
+  const api = await setup(repository, ownerA);
+  assert.equal((await json(await api.request('/api/v1/export'))).body.courses[0].name, 'Assignatura');
+  const client = await api.connect();
+  try { assert.equal((await call(client, 'export_data')).notes[0].content, 'Oblidada'); }
+  finally { await client.close(); }
 });
 
 test('daily summary: Madrid calendar day, due buckets and transparent follow-up rules', async () => {

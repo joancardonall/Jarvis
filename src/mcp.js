@@ -5,6 +5,7 @@ import { projectInput, projectListInput, projectLookup, projectUpdateInput } fro
 import { taskInput, taskListInput, taskUpdateInput } from './tasks.js';
 import { noteInput, noteSearchInput, noteUpdateInput } from './notes.js';
 import { summaryInput } from './summary.js';
+import { courseGroupInput, courseInput, courseListInput, courseLookup, courseUpdateInput } from './courses.js';
 import { publicError } from './errors.js';
 
 const DATES = 'Dates are calendar days in YYYY-MM-DD, interpreted in Europe/Madrid.';
@@ -14,7 +15,7 @@ const empty = z.object({}).strict();
 // Tool descriptions are written for the model that decides when to call them.
 // Each entry: [name, description, input schema, operation(services, owner, input), annotations].
 function tools(services, sendSummary) {
-  const { projects, tasks, notes, summary } = services;
+  const { projects, tasks, notes, summary, courses } = services;
   return [
     ['jarvis.create_project', 'Create a project. Supply an idempotency key to make retries safe.',
       projectInput, projects.create],
@@ -28,7 +29,8 @@ function tools(services, sendSummary) {
     ['jarvis.get_project_overview', 'Get a project together with its open tasks and its active notes (decisions, ' +
       'open questions, facts). Use this first when the user resumes work on a project.',
       projectLookup, services.overview, readOnly],
-    ['jarvis.create_task', `Create a task, optionally inside a project and with a due date. ${DATES} ` +
+    ['jarvis.create_task', 'Create a task, optionally inside a project or a university course (a deliverable ' +
+      `or exam is a task with course_id) and with a due date. ${DATES} ` +
       'Ask the user when a date is ambiguous. Supply an idempotency key to make retries safe.', taskInput, tasks.create],
     ['jarvis.list_tasks', 'List tasks ordered by due date. Defaults to open tasks; status "all" includes done and ' +
       `cancelled. due_before returns tasks due on or before that day. ${DATES}`, taskListInput, tasks.list, readOnly],
@@ -45,11 +47,26 @@ function tools(services, sendSummary) {
       `up to 3 projects that need attention. ${DATES}`, summaryInput, summary.daily, readOnly],
     ['jarvis.send_daily_summary', 'Send today\'s daily summary to the user\'s Telegram right now.',
       empty, sendSummary],
+    ['jarvis.create_course', 'Create a university course (subject). term is free text such as "2026-27 T1". ' +
+      'Supply an idempotency key to make retries safe.', courseInput, courses.create],
+    ['jarvis.list_courses', 'List or search university courses with their groups: kind (theory, seminar, lab), ' +
+      'teacher, schedule and location. Use it to answer who teaches what and to find a course id.',
+      courseListInput, courses.list, readOnly],
+    ['jarvis.update_course', 'Change a course: name, code, term, notes or status (active, archived).',
+      courseUpdateInput, courses.update],
+    ['jarvis.save_course_group', 'Add or update a group of a course, identified by kind and label (for example ' +
+      'seminar "S102"): teacher, schedule, location. Saving the same kind and label again updates it; ' +
+      'status "inactive" hides it.', courseGroupInput, courses.saveGroup],
+    ['jarvis.get_course_overview', 'Get a course with its groups and teachers, its open deliverables (tasks) and ' +
+      'its notes.', courseLookup, courses.overview, readOnly],
+    ['jarvis.export_data', 'Export everything Jarvis stores about the user (projects, tasks, notes, courses), ' +
+      'including archived and inactive items. Can be large; use only when the user asks for an export.',
+      empty, services.exportData, readOnly],
   ];
 }
 
 export async function handleMcp(request, services, owner, sendSummary) {
-  const server = new McpServer({ name: 'jarvis', version: '0.2.0' });
+  const server = new McpServer({ name: 'jarvis', version: '0.3.0' });
   for (const [name, description, inputSchema, operation, annotations] of tools(services, sendSummary)) {
     server.registerTool(name, { description, inputSchema, ...(annotations ? { annotations } : {}) }, async input => {
       try {

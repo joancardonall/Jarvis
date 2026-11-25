@@ -1,6 +1,6 @@
 {
   "name": "jarvis",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -23,6 +23,9 @@
     "db:verify": "node scripts/db.js verify",
     "db:backup": "node scripts/db.js backup",
     "db:restore": "node scripts/db.js restore",
+    "data:purge": "node scripts/db.js purge",
+    "oauth:connections": "node scripts/db.js connections",
+    "oauth:revoke": "node scripts/db.js revoke",
     "test:ops": "node --test tests/ops.test.js",
     "dev:verify-neon": "node scripts/verify-neon.js",
     "dev:verify-worker-neon": "node scripts/verify-neon.js --worker",

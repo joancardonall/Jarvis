@@ -4,20 +4,24 @@ export function memoryRepository() {
   const grants = [];
   const tasks = [];
   const notes = [];
+  const courses = [];
+  const groups = [];
   const summaries = new Map();
   const contains = (value, query) => value.toLowerCase().includes(query.toLowerCase());
   const touch = (owner, projectId, now) => {
     const project = projectId && rows.get(projectId);
     if (project?.owner_id === owner) project.last_activity_at = now;
   };
-  // Shared by tasks and notes: owner-checked project, idempotent replay, then insert.
+  const ownCourse = (owner, id) => courses.find(course => course.id === id && course.owner_id === owner);
+  // Shared by tasks and notes: owner-checked project and course, idempotent replay, then insert.
   const insertItem = (list, item, defaults, now) => {
     const existing = item.idempotency_key && list.find(candidate =>
       candidate.owner_id === item.owner_id && candidate.idempotency_key === item.idempotency_key);
     if (existing) return existing; // a replay changes nothing, not even project activity
     if (item.project_id && rows.get(item.project_id)?.owner_id !== item.owner_id) return undefined;
+    if (item.course_id && !ownCourse(item.owner_id, item.course_id)) return undefined;
     touch(item.owner_id, item.project_id, now);
-    const row = { ...item, ...defaults, created_at: now, updated_at: now };
+    const row = { ...item, course_id: item.course_id ?? null, ...defaults, created_at: now, updated_at: now };
     list.push(row);
     return row;
   };
@@ -26,7 +30,7 @@ export function memoryRepository() {
     access_hash: tokens.access_hash, access_expires_at: tokens.access_expires_at,
     refresh_hash: tokens.refresh_hash, refresh_expires_at: tokens.refresh_expires_at });
   return {
-    rows, grants, tasks, notes, summaries,
+    rows, grants, tasks, notes, summaries, courses, groups,
     // Mirrors the conditions of the SQL statements in src/repository.js.
     async createGrant(grant) {
       if (grants.some(existing => existing.code_hash === grant.code_hash)) throw new Error('duplicate');
@@ -103,11 +107,11 @@ export function memoryRepository() {
       return row;
     },
     async createTask(task, now) { return insertItem(tasks, task, { status: 'open', completed_at: null }, now); },
-    async listTasks(owner, { project_id, status, due_before, limit }) {
+    async listTasks(owner, { project_id, status, due_before, limit, course_id = null }) {
       const rank = { high: 0, normal: 1, low: 2 };
       return tasks
         .filter(task => task.owner_id === owner && (project_id === null || task.project_id === project_id) &&
-          (status === 'all' || task.status === status) &&
+          (course_id === null || task.course_id === course_id) && (status === 'all' || task.status === status) &&
           (due_before === null || (task.due_date !== null && task.due_date <= due_before)))
         .sort((a, b) => (a.due_date ?? '9999') .localeCompare(b.due_date ?? '9999') || rank[a.priority] - rank[b.priority] ||
           time(a.created_at) - time(b.created_at) || a.id.localeCompare(b.id))
@@ -117,19 +121,21 @@ export function memoryRepository() {
       const task = tasks.find(candidate => candidate.id === id && candidate.owner_id === owner);
       if (!task) return undefined;
       if (changes.project_id && rows.get(changes.project_id)?.owner_id !== owner) return undefined;
+      if (changes.course_id && !ownCourse(owner, changes.course_id)) return undefined;
       touch(owner, task.project_id, now); // the project it is leaving, if it moves
       for (const field of ['title', 'notes', 'status', 'priority']) if (changes[field] != null) task[field] = changes[field];
-      for (const field of ['due_date', 'project_id']) if (Object.hasOwn(changes, field)) task[field] = changes[field];
+      for (const field of ['due_date', 'project_id', 'course_id']) if (Object.hasOwn(changes, field)) task[field] = changes[field];
       task.completed_at = task.status === 'done' ? task.completed_at ?? now : null;
       task.updated_at = now;
       touch(owner, task.project_id, now);
       return task;
     },
     async createNote(note, now) { return insertItem(notes, note, { status: 'active' }, now); },
-    async searchNotes(owner, { query, kind, project_id, include_inactive, limit }) {
+    async searchNotes(owner, { query, kind, project_id, include_inactive, limit, course_id = null }) {
       return notes
         .filter(note => note.owner_id === owner && (query === null || contains(note.content, query)) &&
           (kind === null || note.kind === kind) && (project_id === null || note.project_id === project_id) &&
+          (course_id === null || note.course_id === course_id) &&
           (include_inactive || note.status === 'active'))
         .sort((a, b) => time(b.created_at) - time(a.created_at) || a.id.localeCompare(b.id))
         .slice(0, limit);
@@ -141,6 +147,55 @@ export function memoryRepository() {
       note.updated_at = now;
       touch(owner, note.project_id, now);
       return note;
+    },
+    async createCourse(course, now) {
+      const existing = course.idempotency_key && courses.find(candidate =>
+        candidate.owner_id === course.owner_id && candidate.idempotency_key === course.idempotency_key);
+      if (existing) return existing;
+      const row = { ...course, status: 'active', created_at: now, updated_at: now };
+      courses.push(row);
+      return row;
+    },
+    async getCourse(owner, id) { return ownCourse(owner, id); },
+    async listCourses(owner, { status, query, limit }) {
+      return courses
+        .filter(course => course.owner_id === owner && course.status === status &&
+          (query === null || contains(course.name, query) || contains(course.code, query)))
+        .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
+        .slice(0, limit);
+    },
+    async updateCourse(owner, id, changes, now) {
+      const course = ownCourse(owner, id);
+      if (!course) return undefined;
+      for (const field of ['name', 'code', 'term', 'notes', 'status']) if (changes[field] != null) course[field] = changes[field];
+      course.updated_at = now;
+      return course;
+    },
+    async saveCourseGroup(group, now) {
+      if (!ownCourse(group.owner_id, group.course_id)) return undefined;
+      const existing = groups.find(candidate => candidate.course_id === group.course_id &&
+        candidate.kind === group.kind && candidate.label === group.label);
+      if (existing) {
+        for (const field of ['teacher', 'schedule', 'location', 'status']) if (group[field] != null) existing[field] = group[field];
+        existing.updated_at = now;
+        return existing;
+      }
+      const row = { id: group.id, owner_id: group.owner_id, course_id: group.course_id, kind: group.kind,
+        label: group.label, teacher: group.teacher ?? '', schedule: group.schedule ?? '',
+        location: group.location ?? '', status: group.status ?? 'active', created_at: now, updated_at: now };
+      groups.push(row);
+      return row;
+    },
+    async listCourseGroups(owner, courseIds) {
+      const rank = { theory: 0, seminar: 1, lab: 2, other: 3 };
+      return groups
+        .filter(group => group.owner_id === owner && courseIds.includes(group.course_id) && group.status === 'active')
+        .sort((a, b) => rank[a.kind] - rank[b.kind] || a.label.localeCompare(b.label) || a.id.localeCompare(b.id));
+    },
+    async exportTable(owner, table, limit) {
+      const source = { projects: [...rows.values()], tasks, notes, courses, course_groups: groups }[table];
+      return source.filter(row => row.owner_id === owner)
+        .sort((a, b) => time(a.created_at) - time(b.created_at) || a.id.localeCompare(b.id)).slice(0, limit);
     },
     async claimSummary(owner, date, now) {
       const key = `${owner} ${date}`;

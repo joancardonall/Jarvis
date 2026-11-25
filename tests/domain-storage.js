@@ -154,4 +154,73 @@ export async function exerciseDomainStorage(storage, createProject, owner, stran
   assert.equal(await storage.claimSummary(owner, '2030-01-17', at(17)), true);
   await storage.finishSummary(owner, '2030-01-17', 'skipped', at(17));
   assert.equal(await storage.claimSummary(owner, '2030-01-17', at(17)), false);
+
+  // Courses: owner isolation, idempotent creation, literal search, archive hides.
+  const course = (fields, key = null) => ({ id: crypto.randomUUID(), owner_id: owner, name: 'Course', code: '', term: '',
+    notes: '', idempotency_key: key, request_hash: hash('a'), ...fields });
+  const systems = await storage.createCourse(course({ name: 'Operating Systems', code: 'OS_1' }, 'c1'), at(20));
+  assert.equal(systems.status, 'active');
+  assert.equal((await storage.createCourse(course({ name: 'Other', request_hash: hash('b') }, 'c1'), at(20))).id, systems.id);
+  const algebra = await storage.createCourse(course({ name: 'Algebra' }), at(20));
+  const theirs = await storage.createCourse(course({ owner_id: stranger, name: 'Stranger course' }, 'c1'), at(20));
+  assert.notEqual(theirs.id, systems.id);
+  assert.equal((await storage.getCourse(owner, systems.id)).name, 'Operating Systems');
+  assert.equal(await storage.getCourse(owner, theirs.id), undefined);
+  const listCourses = filters => storage.listCourses(owner, { status: 'active', query: null, limit: 10, ...filters });
+  assert.deepEqual((await listCourses({})).map(row => row.name), ['Algebra', 'Operating Systems']);
+  assert.deepEqual((await listCourses({ query: 'os_1' })).map(row => row.name), ['Operating Systems']);
+  assert.equal((await listCourses({ query: 'OS%1' })).length, 0);
+  assert.equal((await listCourses({ limit: 1 })).length, 1);
+  assert.equal((await storage.updateCourse(owner, algebra.id, { term: '2030 T1', status: 'archived' }, at(21))).term, '2030 T1');
+  assert.equal(await storage.updateCourse(stranger, algebra.id, { name: 'Stolen' }, at(21)), undefined);
+  assert.deepEqual((await listCourses({})).map(row => row.name), ['Operating Systems']);
+  assert.deepEqual((await listCourses({ status: 'archived' })).map(row => row.name), ['Algebra']);
+
+  // Groups: upsert by (course, kind, label); omitted fields are kept; foreign course refused.
+  const group = fields => ({ id: crypto.randomUUID(), owner_id: owner, course_id: systems.id, kind: 'seminar', label: 'S1', ...fields });
+  const seminar = await storage.saveCourseGroup(group({ teacher: 'Dr. Synthetic' }), at(22));
+  assert.deepEqual([seminar.teacher, seminar.schedule, seminar.location, seminar.status], ['Dr. Synthetic', '', '', 'active']);
+  const again = await storage.saveCourseGroup(group({ location: 'Room 5' }), at(23));
+  assert.equal(again.id, seminar.id);
+  assert.deepEqual([again.teacher, again.location], ['Dr. Synthetic', 'Room 5']);
+  await storage.saveCourseGroup(group({ kind: 'theory', label: '', teacher: 'Dr. Theory' }), at(23));
+  await storage.saveCourseGroup(group({ kind: 'lab', label: 'L2' }), at(23));
+  await storage.saveCourseGroup(group({ kind: 'lab', label: 'L1' }), at(23));
+  assert.equal(await storage.saveCourseGroup(group({ course_id: theirs.id }), at(23)), undefined);
+  assert.equal(await storage.saveCourseGroup(group({ owner_id: stranger }), at(23)), undefined);
+  assert.deepEqual((await storage.listCourseGroups(owner, [systems.id, algebra.id])).map(row => `${row.kind}:${row.label}`),
+    ['theory:', 'seminar:S1', 'lab:L1', 'lab:L2']);
+  await storage.saveCourseGroup(group({ kind: 'lab', label: 'L2', status: 'inactive' }), at(24));
+  assert.equal((await storage.listCourseGroups(owner, [systems.id])).length, 3);
+  assert.deepEqual(await storage.listCourseGroups(stranger, [systems.id]), []);
+  assert.deepEqual(await storage.listCourseGroups(owner, []), []);
+
+  // Tasks and notes linked to a course: ownership enforced, filters, linking and unlinking.
+  assert.equal(await storage.createTask(task({ course_id: theirs.id }), at(25)), undefined);
+  assert.equal(await storage.createTask(task({ course_id: crypto.randomUUID() }), at(25)), undefined);
+  // A valid project with a foreign course inserts nothing and records no activity on the project.
+  const bikeActivity = time((await storage.get(owner, bike.id)).last_activity_at);
+  assert.equal(await storage.createTask(task({ project_id: bike.id, course_id: theirs.id }), at(25)), undefined);
+  assert.equal(time((await storage.get(owner, bike.id)).last_activity_at), bikeActivity);
+  const lab = await storage.createTask(task({ title: 'Lab 2', course_id: systems.id, due_date: '2030-01-28' }), at(25));
+  assert.equal(lab.course_id, systems.id);
+  assert.equal(lab.project_id, null);
+  assert.deepEqual((await list({ course_id: systems.id })).map(row => row.title), ['Lab 2']);
+  assert.equal(await storage.updateTask(owner, lab.id, { course_id: theirs.id }, at(26)), undefined);
+  assert.equal((await storage.updateTask(owner, lab.id, { course_id: null }, at(26))).course_id, null);
+  assert.equal((await storage.updateTask(owner, lab.id, { course_id: systems.id, title: 'Lab 2b' }, at(26))).course_id, systems.id);
+  assert.equal((await storage.updateTask(owner, lab.id, { priority: 'high' }, at(26))).course_id, systems.id);
+  assert.equal(await storage.createNote(note({ course_id: theirs.id }), at(27)), undefined);
+  const exam = await storage.createNote(note({ kind: 'fact', content: 'Exam is 40%', course_id: systems.id }), at(27));
+  assert.equal(exam.course_id, systems.id);
+  assert.deepEqual((await search({ course_id: systems.id })).map(row => row.content), ['Exam is 40%']);
+
+  // Export: every row of one owner per table, oldest first, never another owner's.
+  const exported = await storage.exportTable(owner, 'courses', 10);
+  assert.deepEqual(exported.map(row => row.name).sort(), ['Algebra', 'Operating Systems']);
+  assert.equal((await storage.exportTable(owner, 'course_groups', 10)).length, 4);
+  assert.equal((await storage.exportTable(owner, 'notes', 100)).every(row => row.owner_id === owner), true);
+  assert.equal((await storage.exportTable(owner, 'notes', 100)).some(row => row.status === 'inactive'), true);
+  assert.equal((await storage.exportTable(owner, 'tasks', 2)).length, 2);
+  assert.deepEqual((await storage.exportTable(stranger, 'projects', 10)).map(row => row.name), ['Foreign project']);
 }

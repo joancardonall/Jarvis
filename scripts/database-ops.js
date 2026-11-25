@@ -10,7 +10,7 @@ export async function migrationDefinition() {
 
 // Migrations applied after version 001, in order.
 const LATER_MIGRATIONS = [{ version: '002', file: '002_oauth_grants.sql' },
-  { version: '003', file: '003_tasks_notes_summary.sql' }];
+  { version: '003', file: '003_tasks_notes_summary.sql' }, { version: '004', file: '004_courses.sql' }];
 const withoutTransaction = sql => sql.replace(/^BEGIN;\s*/, '').replace(/COMMIT;\s*$/, '');
 
 export async function laterMigrations() {
@@ -65,38 +65,52 @@ export const RUNTIME_GRANTS = [
      snoozed_until, updated_at, last_activity_at) ON public.projects TO jarvis_runtime`,
   'GRANT SELECT, INSERT, UPDATE ON public.oauth_grants TO jarvis_runtime',
   `GRANT SELECT, INSERT, UPDATE (idempotency_key, title, notes, status, priority, due_date, project_id,
-     completed_at, updated_at) ON public.tasks TO jarvis_runtime`,
+     course_id, completed_at, updated_at) ON public.tasks TO jarvis_runtime`,
   'GRANT SELECT, INSERT, UPDATE (idempotency_key, content, kind, status, updated_at) ON public.notes TO jarvis_runtime',
   'GRANT SELECT, INSERT, UPDATE (status, attempts, updated_at) ON public.summary_runs TO jarvis_runtime',
+  'GRANT SELECT, INSERT, UPDATE (idempotency_key, name, code, term, notes, status, updated_at) ON public.courses TO jarvis_runtime',
+  'GRANT SELECT, INSERT, UPDATE (teacher, schedule, location, status, updated_at) ON public.course_groups TO jarvis_runtime',
 ];
 export async function grantRuntime(client) {
   for (const statement of RUNTIME_GRANTS) await client.query(statement);
 }
 
-// Logical backup (format 2): the user's data, that is projects, tasks and notes. OAuth grants and
+// Logical backup: the user's data, that is projects, courses, tasks and notes. OAuth grants and
 // the summary ledger are operational state and are deliberately left out: after a restore, clients
 // log in again. Every value is validated before it is written or restored.
+// Format 3 is written; format 2 (before courses) can still be restored: fields and tables added
+// later take their defaults, exactly as the migrations give them to existing rows.
 const id = z.string().uuid();
 const instant = z.iso.datetime();
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable();
 const key = z.string().regex(/^[A-Za-z0-9._:-]{1,128}$/).nullable();
 const hash = z.string().regex(/^[a-f0-9]{64}$/);
 const priority = z.enum(['low', 'normal', 'high']);
+// Order matters for restoring: a table comes after the tables it references.
 const TABLES = {
   projects: z.object({ id, owner_id: id, name: z.string().min(1).max(200), description: z.string().max(2000),
     status: z.enum(['active', 'paused', 'completed', 'archived']), priority, review_at: day, snoozed_until: day,
     created_at: instant, updated_at: instant, last_activity_at: instant, idempotency_key: key, request_hash: hash }).strict(),
+  courses: z.object({ id, owner_id: id, name: z.string().min(1).max(200), code: z.string().max(40),
+    term: z.string().max(60), notes: z.string().max(4000), status: z.enum(['active', 'archived']),
+    created_at: instant, updated_at: instant, idempotency_key: key, request_hash: hash }).strict(),
+  course_groups: z.object({ id, owner_id: id, course_id: id, kind: z.enum(['theory', 'seminar', 'lab', 'other']),
+    label: z.string().max(60), teacher: z.string().max(200), schedule: z.string().max(300),
+    location: z.string().max(200), status: z.enum(['active', 'inactive']), created_at: instant, updated_at: instant }).strict(),
   tasks: z.object({ id, owner_id: id, project_id: id.nullable(), title: z.string().min(1).max(300),
     notes: z.string().max(4000), status: z.enum(['open', 'done', 'cancelled']), priority, due_date: day,
-    created_at: instant, updated_at: instant, completed_at: instant.nullable(), idempotency_key: key, request_hash: hash }).strict(),
+    created_at: instant, updated_at: instant, completed_at: instant.nullable(), idempotency_key: key, request_hash: hash,
+    course_id: id.nullable().default(null) }).strict(),
   notes: z.object({ id, owner_id: id, project_id: id.nullable(),
     kind: z.enum(['decision', 'open_question', 'fact', 'preference', 'note']), content: z.string().min(1).max(4000),
     source: z.string().max(200), status: z.enum(['active', 'inactive']),
-    created_at: instant, updated_at: instant, idempotency_key: key, request_hash: hash }).strict(),
+    created_at: instant, updated_at: instant, idempotency_key: key, request_hash: hash,
+    course_id: id.nullable().default(null) }).strict(),
 };
-const payloadSchema = z.object({ format: z.literal(2), migrations: z.record(z.string(), z.string()),
-  projects: z.array(TABLES.projects).max(10000), tasks: z.array(TABLES.tasks).max(50000),
-  notes: z.array(TABLES.notes).max(50000) }).strict();
+const payloadSchema = z.object({ format: z.union([z.literal(2), z.literal(3)]), migrations: z.record(z.string(), z.string()),
+  projects: z.array(TABLES.projects).max(10000), courses: z.array(TABLES.courses).max(1000).default([]),
+  course_groups: z.array(TABLES.course_groups).max(10000).default([]),
+  tasks: z.array(TABLES.tasks).max(50000), notes: z.array(TABLES.notes).max(50000) }).strict();
 
 export async function migrationHashes() {
   const later = await laterMigrations();
@@ -107,11 +121,22 @@ export function packSnapshot(payload) {
   const validated = payloadSchema.parse(payload);
   return { payload: validated, sha256: checksum(JSON.stringify(validated)) };
 }
+
+// A snapshot is restorable when it is intact and every migration it was taken under is still one
+// of ours, unchanged. Newer migrations are fine: they are applied before the rows are inserted.
 export async function validateSnapshot(snapshot) {
+  if (snapshot?.sha256 !== checksum(JSON.stringify(snapshot?.payload))) throw new Error('invalid_snapshot');
   const payload = payloadSchema.parse(snapshot.payload);
-  if (snapshot.sha256 !== checksum(JSON.stringify(payload)) ||
-      JSON.stringify(payload.migrations) !== JSON.stringify(await migrationHashes())) throw new Error('invalid_snapshot');
+  const current = await migrationHashes();
+  const taken = Object.entries(payload.migrations);
+  if (!taken.length || !taken.every(([version, sha]) => current[version] === sha)) throw new Error('invalid_snapshot');
   return payload;
+}
+
+// The rows of a snapshot in a form that can be compared across formats (used to verify a restore).
+export function snapshotRows(payload) {
+  const parsed = payloadSchema.parse(payload);
+  return Object.fromEntries(Object.keys(TABLES).map(table => [table, parsed[table]]));
 }
 
 // pg returns timestamps and dates as Date objects; the snapshot stores unambiguous text.
@@ -133,9 +158,10 @@ export async function snapshotData(client) {
     if (JSON.stringify(Object.fromEntries(ledger.rows.map(row => [row.version, row.sha256]))) !== JSON.stringify(migrations)) {
       throw new Error('migration_mismatch');
     }
-    const payload = { format: 2, migrations };
-    for (const table of Object.keys(TABLES)) {
-      payload[table] = (await client.query(`SELECT * FROM public.${table} ORDER BY id`)).rows.map(plain);
+    const payload = { format: 3, migrations };
+    for (const [table, schema] of Object.entries(TABLES)) {
+      // Explicit column list in the schema's order, so the file does not depend on column order in the database.
+      payload[table] = (await client.query(`SELECT ${Object.keys(schema.shape).join(', ')} FROM public.${table} ORDER BY id`)).rows.map(plain);
     }
     const snapshot = packSnapshot(payload);
     await client.query('COMMIT');
@@ -160,4 +186,60 @@ export async function restoreData(client, snapshot) {
     }
     await client.query('COMMIT');
   } catch (error) { await client.query('ROLLBACK'); throw error; }
+}
+
+// --- Data policy operations (D027). Run by the developer with the migration role, never by the Worker. ---
+
+// Permanently erases what the user already discarded (forgotten notes, cancelled tasks, archived
+// projects and courses with everything inside them) once it is older than `days`, plus expired
+// operational rows. With confirm = false everything runs and is rolled back: an exact preview.
+export async function purgeDiscarded(client, { days, confirm = false, now = new Date() }) {
+  if (!Number.isInteger(days) || days < 0 || days > 3650) throw new Error('invalid_days');
+  const cutoff = new Date(now.getTime() - days * 86400000).toISOString();
+  const count = async (text, values = [cutoff]) => (await client.query(text, values)).rowCount;
+  const archivedProjects = "SELECT id FROM public.projects WHERE status = 'archived' AND updated_at < $1";
+  const archivedCourses = "SELECT id FROM public.courses WHERE status = 'archived' AND updated_at < $1";
+  await client.query('BEGIN');
+  try {
+    const erased = {
+      notes: await count(`DELETE FROM public.notes WHERE (status = 'inactive' AND updated_at < $1)
+        OR project_id IN (${archivedProjects}) OR course_id IN (${archivedCourses})`),
+      tasks: await count(`DELETE FROM public.tasks WHERE (status = 'cancelled' AND updated_at < $1)
+        OR project_id IN (${archivedProjects}) OR course_id IN (${archivedCourses})`),
+      course_groups: await count(`DELETE FROM public.course_groups WHERE (status = 'inactive' AND updated_at < $1)
+        OR course_id IN (${archivedCourses})`),
+      projects: await count(`DELETE FROM public.projects WHERE id IN (${archivedProjects})`),
+      courses: await count(`DELETE FROM public.courses WHERE id IN (${archivedCourses})`),
+      // Connections that can no longer be used: revoked, expired, or a code that was never redeemed.
+      oauth_grants: await count(`DELETE FROM public.oauth_grants WHERE revoked_at < $1 OR refresh_expires_at < $1
+        OR (code_used_at IS NULL AND code_expires_at < $1)`),
+      summary_runs: await count('DELETE FROM public.summary_runs WHERE summary_date < $1::timestamptz::date'),
+    };
+    await client.query(confirm ? 'COMMIT' : 'ROLLBACK');
+    return { erased, confirmed: confirm, cutoff };
+  } catch (error) { await client.query('ROLLBACK'); throw error; }
+}
+
+// Lists client connections without exposing any hash: enough to recognise and revoke one.
+export async function listConnections(client, now = new Date()) {
+  const result = await client.query(`SELECT id, created_at, redirect_uri, code_used_at, refresh_rotated_at,
+    refresh_expires_at, revoked_at FROM public.oauth_grants ORDER BY created_at`);
+  return result.rows.map(row => ({
+    id: row.id, created_at: row.created_at.toISOString(),
+    client: new URL(row.redirect_uri).hostname,
+    last_renewed_at: (row.refresh_rotated_at ?? row.code_used_at)?.toISOString() ?? null,
+    status: row.revoked_at ? 'revoked' : !row.code_used_at ? 'never_completed'
+      : row.refresh_expires_at <= now ? 'expired' : 'active',
+  }));
+}
+
+// Revokes one connection by id, or all of them. The client must log in again; nothing else changes.
+export async function revokeConnections(client, target, now = new Date()) {
+  if (target !== 'all' && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(target ?? '')) {
+    throw new Error('invalid_connection_id');
+  }
+  const result = target === 'all'
+    ? await client.query('UPDATE public.oauth_grants SET revoked_at = $1 WHERE revoked_at IS NULL', [now.toISOString()])
+    : await client.query('UPDATE public.oauth_grants SET revoked_at = $1 WHERE revoked_at IS NULL AND id = $2', [now.toISOString(), target]);
+  return result.rowCount;
 }

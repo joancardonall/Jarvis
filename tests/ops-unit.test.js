@@ -30,15 +30,36 @@ test('logical snapshot rejects corruption, wrong migrations, old formats and inv
     due_date: null, created_at: instant, updated_at: instant, completed_at: null, idempotency_key: 'key-1', request_hash: 'a'.repeat(64) };
   const note = { id, owner_id: id, project_id: null, kind: 'decision', content: 'Synthetic', source: '', status: 'active',
     created_at: instant, updated_at: instant, idempotency_key: null, request_hash: 'a'.repeat(64) };
-  const payload = { format: 2, migrations: await migrationHashes(), projects: [project], tasks: [task], notes: [note] };
-  assert.deepEqual(Object.keys(payload.migrations), ['001', '002', '003']);
+  const migrations = await migrationHashes();
+  assert.deepEqual(Object.keys(migrations), ['001', '002', '003', '004']);
+  const course = { id, owner_id: id, name: 'Synthetic', code: '', term: '', notes: '', status: 'active',
+    created_at: instant, updated_at: instant, idempotency_key: null, request_hash: 'a'.repeat(64) };
+  const payload = { format: 3, migrations, projects: [project], courses: [course], course_groups: [],
+    tasks: [{ ...task, course_id: id }], notes: [{ ...note, course_id: null }] };
   const snapshot = packSnapshot(payload);
   assert.deepEqual(await validateSnapshot(snapshot), payload);
   await assert.rejects(validateSnapshot({ ...snapshot, sha256: 'changed' }));
-  await assert.rejects(validateSnapshot(packSnapshot({ ...payload, migrations: { ...payload.migrations, '003': 'other' } })));
-  await assert.rejects(validateSnapshot(packSnapshot({ ...payload, migrations: { '001': payload.migrations['001'] } })));
+  await assert.rejects(validateSnapshot({ payload: { ...snapshot.payload, projects: [] }, sha256: snapshot.sha256 }));
+  await assert.rejects(validateSnapshot(packSnapshot({ ...payload, migrations: { ...migrations, '003': 'other' } })));
+  await assert.rejects(validateSnapshot(packSnapshot({ ...payload, migrations: { ...migrations, '099': 'unknown' } })));
+  await assert.rejects(validateSnapshot(packSnapshot({ ...payload, migrations: {} })));
+  await assert.rejects(validateSnapshot(null));
   assert.throws(() => packSnapshot({ ...payload, unexpected: true }));
   assert.throws(() => packSnapshot({ ...payload, format: 1 }));
+  assert.throws(() => packSnapshot({ ...payload, courses: [{ ...course, status: 'deleted' }] }));
+
+  // A backup written before courses existed (format 2, migrations 001-003) is still restorable:
+  // what was added later takes its default. This is exactly the shape of the file saved on 2026-11-25.
+  const { createHash } = await import('node:crypto');
+  const { '004': _newer, ...olderMigrations } = migrations;
+  const olderPayload = { format: 2, migrations: olderMigrations, projects: [project], tasks: [task], notes: [note] };
+  const older = { payload: olderPayload, sha256: createHash('sha256').update(JSON.stringify(olderPayload)).digest('hex') };
+  const upgraded = await validateSnapshot(older);
+  assert.deepEqual(upgraded.courses, []);
+  assert.equal(upgraded.tasks[0].course_id, null);
+  assert.equal(upgraded.notes[0].course_id, null);
+  const { snapshotRows } = await import('../scripts/database-ops.js');
+  assert.deepEqual(Object.keys(snapshotRows(olderPayload)), ['projects', 'courses', 'course_groups', 'tasks', 'notes']);
   assert.throws(() => packSnapshot({ ...payload, projects: [{ ...project, status: 'deleted' }] }));
   assert.throws(() => packSnapshot({ ...payload, projects: [{ ...project, extra: true }] }));
   assert.throws(() => packSnapshot({ ...payload, tasks: [{ ...task, due_date: '2030-1-1' }] }));
@@ -132,7 +153,7 @@ test('OAuth secrets template is private, has a strong signing key and is never o
 test('later migrations are tracked by checksum and keep the projects snapshot format stable', async () => {
   const { laterMigrations } = await import('../scripts/database-ops.js');
   const migrations = await laterMigrations();
-  assert.deepEqual(migrations.map(migration => migration.version), ['002', '003']);
+  assert.deepEqual(migrations.map(migration => migration.version), ['002', '003', '004']);
   assert.match(migrations[0].sql, /CREATE TABLE oauth_grants/);
   assert.match(migrations[0].hash, /^[a-f0-9]{64}$/);
 });

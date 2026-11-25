@@ -51,7 +51,7 @@ test('workerd runtime: health, auth and official MCP discovery over real HTTP', 
       await client.connect(new StreamableHTTPClientTransport(new URL(`${base}/mcp`), {
         requestInit: { headers: { Authorization: `Bearer ${token}` } },
       }));
-      assert.equal((await client.listTools()).tools.length, 13);
+      assert.equal((await client.listTools()).tools.length, 19);
     } finally { await client.close(); }
   } finally {
     if (worker.exitCode === null) {

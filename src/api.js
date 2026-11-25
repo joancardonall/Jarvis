@@ -22,7 +22,7 @@ function filters(url, { numbers = ['limit'], booleans = [] } = {}) {
 }
 
 export async function handleApi(request, url, { services, owner, readJson, sendSummary }) {
-  const { projects, tasks, notes, summary } = services;
+  const { projects, tasks, notes, summary, courses } = services;
   const [, collection, id, action, ...rest] = url.pathname.slice('/api/v1'.length).split('/');
   if (!url.pathname.startsWith('/api/v1/') || rest.length) throw new AppError(404, 'route_not_found');
   // "daily-summary/send" is an action on a collection without ids; everything else is "<collection>/<id>[/<action>]".
@@ -48,6 +48,12 @@ export async function handleApi(request, url, { services, owner, readJson, sendS
     case 'POST notes': return [await notes.create(owner, await creation('invalid_note')), 201];
     case 'GET notes': return [await notes.search(owner, filters(url, { booleans: ['include_inactive'] }))];
     case 'PATCH notes/:id': return [await notes.update(owner, await change('invalid_note_update', 'note_id'))];
+    case 'POST courses': return [await courses.create(owner, await creation('invalid_course')), 201];
+    case 'GET courses': return [await courses.list(owner, filters(url))];
+    case 'PATCH courses/:id': return [await courses.update(owner, await change('invalid_course_update', 'course_id'))];
+    case 'GET courses/:id/overview': return [await courses.overview(owner, { course_id: id })];
+    case 'PUT courses/:id/groups': return [await courses.saveGroup(owner, await change('invalid_course_group', 'course_id'))];
+    case 'GET export': return [await services.exportData(owner)];
     case 'GET daily-summary': return [await summary.daily(owner, filters(url))];
     case 'POST daily-summary/send': return [await sendSummary(owner)];
     default: throw new AppError(404, 'route_not_found');
