@@ -1,6 +1,8 @@
 import { authenticate } from './auth.js';
 import { AppError, publicError } from './errors.js';
-import { createProjectService } from './projects.js';
+import { createServices } from './services.js';
+import { handleApi } from './api.js';
+import { runScheduledSummary, sendSummaryNow } from './telegram.js';
 import { neonRepository } from './repository.js';
 import { handleMcp } from './mcp.js';
 import { handleOAuth, isConsentSubmission, resourceMetadataUrl } from './oauth.js';
@@ -66,7 +68,8 @@ export function createApp(repositoryFactory = env => neonRepository(env.DATABASE
         const oauthResponse = await handleOAuth(request, url, env, { repository, fetchUpstream, now, readJson, readForm });
         if (oauthResponse) return oauthResponse;
         const owner = await authenticate(request, env, { repository, now });
-        const service = createProjectService(repository());
+        const services = createServices(repository(), clock);
+        const sendSummary = ownerId => sendSummaryNow(env, services.summary, ownerId, fetchUpstream);
         if (url.pathname === '/mcp') {
           // Bound the body before handing parsed JSON back through the official transport.
           let incoming = request;
@@ -75,23 +78,13 @@ export function createApp(repositoryFactory = env => neonRepository(env.DATABASE
             incoming = new Request(request.url, { method: 'POST', headers: request.headers,
               body: JSON.stringify(body) });
           }
-          const response = await handleMcp(incoming, service, owner);
+          const response = await handleMcp(incoming, services, owner, sendSummary);
           const headers = new Headers(response.headers);
           headers.set('Cache-Control', 'no-store');
           return new Response(response.body, { status: response.status, headers });
         }
-        if (url.pathname === '/api/v1/projects' && request.method === 'POST') {
-          const body = await readJson(request);
-          if (body === null || typeof body !== 'object' || Array.isArray(body) || 'idempotency_key' in body) {
-            throw new AppError(422, 'invalid_project');
-          }
-          const key = request.headers.get('Idempotency-Key');
-          const project = await service.create(owner, { ...body, ...(key === null ? {} : { idempotency_key: key }) });
-          return json(project, 201);
-        }
-        const match = /^\/api\/v1\/projects\/([^/]+)$/.exec(url.pathname);
-        if (match && request.method === 'GET') return json(await service.get(owner, { project_id: match[1] }));
-        throw new AppError(404, 'route_not_found');
+        const [body, status] = await handleApi(request, url, { services, owner, readJson, sendSummary });
+        return json(body, status);
       } catch (error) {
         const safe = publicError(error);
         const response = json({ error: safe.code }, safe.status);
@@ -99,6 +92,17 @@ export function createApp(repositoryFactory = env => neonRepository(env.DATABASE
         if (safe.status === 401) response.headers.set('WWW-Authenticate',
           `Bearer realm="jarvis", resource_metadata="${resourceMetadataUrl(url.origin)}"`);
         return response;
+      }
+    },
+    // Cron trigger (see wrangler.jsonc): sends the morning summary to Telegram, if configured.
+    async scheduled(_controller, env) {
+      try {
+        const repository = repositoryFactory(env);
+        return await runScheduledSummary(env, repository, createServices(repository, clock).summary,
+          { fetchUpstream, now: clock() });
+      } catch {
+        // Never log the error object: it may contain connection data. The ledger shows the outcome.
+        return 'failed';
       }
     },
   };

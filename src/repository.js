@@ -1,4 +1,5 @@
 import { neon } from '@neondatabase/serverless';
+import { domainOperations } from './domain-repository.js';
 
 // Shared parameterized SQL is also exercised against real PostgreSQL in integration tests.
 export const CREATE_PROJECT = `
@@ -86,6 +87,7 @@ export function neonRepository(url) {
   const query = (text, values) => sql.query(text, values, { fetchOptions: { signal: AbortSignal.timeout(10000) } });
   return {
     ...grantOperations(query),
+    ...domainOperations(query),
     async create(data) {
       // The conflict path locks the existing row and returns its original fingerprint.
       // All persisted creation state lives in this row: no partial second record is possible.

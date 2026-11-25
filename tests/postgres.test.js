@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { Pool } from 'pg';
 import { CREATE_PROJECT, GET_PROJECT, createValues, grantOperations } from '../src/repository.js';
+import { domainOperations } from '../src/domain-repository.js';
+import { exerciseDomainStorage } from './domain-storage.js';
 import { setup, ownerA, ownerB } from './helpers.js';
 import { exerciseGrantStorage } from './grant-storage.js';
 
@@ -101,6 +103,60 @@ test('real PostgreSQL: OAuth grant migration, single-use codes, rotation and con
     assert.equal(results.filter(Boolean).length, 1);
     await assert.rejects(pool.query("UPDATE oauth_grants SET access_hash = 'not-a-hash'"), { code: '23514' });
     await assert.rejects(pool.query('UPDATE oauth_grants SET owner_id = NULL'), { code: '23502' });
+  } finally {
+    await pool.end();
+    await admin.query(`DROP SCHEMA ${schema} CASCADE`);
+    await admin.end();
+  }
+});
+
+test('real PostgreSQL: migration 003 keeps existing projects; tasks, notes and summary ledger follow the shared scenario', async () => {
+  const admin = new Pool({ connectionString: target });
+  const schema = 'jarvis_test_' + crypto.randomUUID().replaceAll('-', '');
+  await admin.query(`CREATE SCHEMA ${schema}`);
+  const pool = new Pool({ connectionString: target, options: `-c search_path=${schema}`, max: 12 });
+  const run = async (text, values) => (await pool.query(text, values)).rows;
+  const sql = name => readFile(new URL(`../migrations/${name}`, import.meta.url), 'utf8');
+  try {
+    // A project created before the migration must survive it with sensible defaults.
+    await pool.query(await sql('001_projects.sql'));
+    const legacy = (await run(CREATE_PROJECT, [crypto.randomUUID(), ownerB, 'Legacy project', '', null, 'a'.repeat(64)]))[0];
+    await pool.query("UPDATE projects SET updated_at = '2029-12-01T10:00:00Z' WHERE id = $1", [legacy.id]);
+    await pool.query(await sql('003_tasks_notes_summary.sql'));
+    const migrated = (await run(GET_PROJECT, [ownerB, legacy.id]))[0];
+    assert.equal(migrated.priority, 'normal');
+    assert.equal(migrated.status, 'active');
+    assert.equal(migrated.review_at, null);
+    assert.equal(migrated.last_activity_at.toISOString(), '2029-12-01T10:00:00.000Z');
+    await pool.query('DELETE FROM projects');
+
+    const storage = { ...domainOperations(run), get: async (owner, id) => (await run(GET_PROJECT, [owner, id]))[0] };
+    const createProject = async (owner, name, description) =>
+      (await run(CREATE_PROJECT, [crypto.randomUUID(), owner, name, description, null, 'a'.repeat(64)]))[0];
+    await exerciseDomainStorage(storage, createProject, ownerA, ownerB);
+
+    // The database itself refuses cross-owner links and inconsistent rows, whatever the application does.
+    const foreign = await createProject(ownerB, 'Constraint project', '');
+    await assert.rejects(pool.query(`INSERT INTO tasks (id, owner_id, project_id, title, request_hash)
+      VALUES ($1, $2, $3, 'Cross owner', $4)`, [crypto.randomUUID(), ownerA, foreign.id, 'a'.repeat(64)]), { code: '23503' });
+    await assert.rejects(pool.query(`INSERT INTO notes (id, owner_id, project_id, kind, content, request_hash)
+      VALUES ($1, $2, $3, 'note', 'Cross owner', $4)`, [crypto.randomUUID(), ownerA, foreign.id, 'a'.repeat(64)]), { code: '23503' });
+    await assert.rejects(pool.query("UPDATE tasks SET status = 'done' WHERE completed_at IS NULL"), { code: '23514' });
+    await assert.rejects(pool.query("UPDATE tasks SET status = 'pending'"), { code: '23514' });
+    await assert.rejects(pool.query("UPDATE notes SET kind = 'secret'"), { code: '23514' });
+    await assert.rejects(pool.query("UPDATE projects SET status = 'deleted'"), { code: '23514' });
+    await assert.rejects(pool.query("UPDATE projects SET priority = 'urgent'"), { code: '23514' });
+    await assert.rejects(pool.query("UPDATE tasks SET title = '  '"), { code: '23514' });
+
+    // Ten simultaneous creations with one idempotency key produce a single task.
+    const key = 'concurrent-task';
+    const created = await Promise.all(Array.from({ length: 10 }, () => storage.createTask({ id: crypto.randomUUID(),
+      owner_id: ownerA, project_id: null, title: 'Concurrent', notes: '', priority: 'normal', due_date: null,
+      idempotency_key: key, request_hash: 'e'.repeat(64) }, new Date())));
+    assert.equal(new Set(created.map(row => row.id)).size, 1);
+    // Ten simultaneous claims of the same day: exactly one may send.
+    const claims = await Promise.all(Array.from({ length: 10 }, () => storage.claimSummary(ownerA, '2031-05-05', new Date())));
+    assert.equal(claims.filter(Boolean).length, 1);
   } finally {
     await pool.end();
     await admin.query(`DROP SCHEMA ${schema} CASCADE`);

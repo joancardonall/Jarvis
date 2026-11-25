@@ -37,7 +37,7 @@ await runSafely(async () => {
     await client.connect(new StreamableHTTPClientTransport(new URL(`${base}/mcp`), {
       requestInit: { headers }, fetch: (url, options) => send(new Request(url, options)),
     }));
-    assert.equal((await client.listTools()).tools.length, 2);
+    assert.equal((await client.listTools()).tools.length, 13);
     assert.deepEqual((await client.callTool({ name: 'jarvis.get_project', arguments: { project_id: first.id } })).structuredContent, first);
     const result = await client.callTool({ name: 'jarvis.create_project', arguments: {
       name: 'Synthetic Neon MCP proof', idempotency_key: 'jarvis-neon-mcp-proof',

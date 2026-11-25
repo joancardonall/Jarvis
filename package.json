@@ -1,6 +1,6 @@
 {
   "name": "jarvis",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -8,13 +8,15 @@
   },
   "scripts": {
     "dev": "wrangler dev --ip 127.0.0.1 --port 8787",
-    "test": "node --test tests/app.test.js tests/oauth.test.js tests/ops-unit.test.js",
+    "test": "node --test tests/app.test.js tests/oauth.test.js tests/domain.test.js tests/ops-unit.test.js",
     "test:postgres": "node --test tests/postgres.test.js",
     "check": "node scripts/check.js",
     "build": "wrangler deploy --dry-run --outdir dist",
     "token": "node scripts/token.js",
     "token:rotate": "node scripts/token.js --rotate",
     "oauth:setup": "node scripts/oauth-setup.js",
+    "telegram:setup": "node scripts/telegram-setup.js",
+    "telegram:chat": "node scripts/telegram-setup.js --chat",
     "test:worker": "node --test tests/worker.test.js",
     "ops:provision": "node scripts/provision.js",
     "db:migrate": "node scripts/db.js migrate",

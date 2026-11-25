@@ -15,8 +15,14 @@ test('API create -> MCP get; MCP create -> new API instance get', async () => {
   assert.equal('request_hash' in first, false);
   const client = await api.connect();
   try {
-    assert.deepEqual((await client.listTools()).tools.map(t => t.name).sort(),
-      ['jarvis.create_project', 'jarvis.get_project']);
+    const tools = (await client.listTools()).tools;
+    assert.deepEqual(tools.map(t => t.name).sort(), ['jarvis.create_project', 'jarvis.create_task',
+      'jarvis.get_daily_summary', 'jarvis.get_project', 'jarvis.get_project_overview', 'jarvis.list_projects',
+      'jarvis.list_tasks', 'jarvis.save_note', 'jarvis.search_notes', 'jarvis.send_daily_summary',
+      'jarvis.update_note', 'jarvis.update_project', 'jarvis.update_task']);
+    // Read-only tools are declared as such so clients can allow them without confirmation.
+    assert.deepEqual(tools.filter(t => t.annotations?.readOnlyHint).map(t => t.name).sort(), ['jarvis.get_daily_summary',
+      'jarvis.get_project', 'jarvis.get_project_overview', 'jarvis.list_projects', 'jarvis.list_tasks', 'jarvis.search_notes']);
     const read = await client.callTool({ name: 'jarvis.get_project', arguments: { project_id: first.id } });
     assert.deepEqual(read.structuredContent, first);
     const created = await client.callTool({ name: 'jarvis.create_project', arguments: { name: 'Second synthetic project' } });
