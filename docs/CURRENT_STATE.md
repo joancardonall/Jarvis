@@ -24,13 +24,25 @@ connexió amb Claude Code, ara disponible; només dades fictícies i pla Free.
 web/app i Claude Code. **Implementat però no publicat:** llistar i editar projectes, tasques,
 notes, resum diari i Telegram (D024–D026), a la branca `feat/jarvis-core`.
 
-## Projectes, tasques, memòria, resum i Telegram (D024–D026) — implementat, NO desplegat
+## Projectes, tasques, memòria, resum i Telegram (D024–D026) — BD migrada, Worker NO desplegat
 
 Aprovat per l'usuari el 2026-11-25 com a llista de deu increments a fer sense interrupcions.
 No autoritzat: desplegar, migrar la BD real, fusionar a main ni dades personals reals.
-**El Worker públic continua exposant només les 2 eines de D023** i Neon només té les
-migracions 001 i 002. Decisions a [DECISIONS](DECISIONS.md), passos d'activació a
-[DEVELOPMENT](DEVELOPMENT.md).
+**El Worker públic continua exposant només les 2 eines de D023.**
+
+**Base de dades real, 2026-11-25** (autoritzat per l'usuari; executat per l'agent):
+- `npm run db:migrate`: *Migrations 001-003 and runtime table grants verified.*
+- `npm run db:verify`: *Runtime connection and minimum permissions verified.*
+- `npm run db:backup`: còpia format 2 desada a `backups/` amb data (fitxer privat, ignorat per Git).
+- Token fix local renovat amb `npm run token:rotate` (còpia prèvia dels dos fitxers a
+  `backups/`); **només en local**: els secrets del Worker no s'han tocat i el seu token fix
+  continua caducat. `npm run dev:verify-remote` no funcionarà fins que es pugin.
+- `npm run dev:verify-neon`: **passa**. Prova des de Node, amb el **driver HTTP real de Neon**,
+  projectes, tasques, notes, resum de projecte i resum diari. Ha deixat una tasca i una nota
+  fictícies amb claus estables al projecte de prova.
+- El Worker antic continua funcionant sobre l'esquema nou (comprovat: salut i 401 correctes).
+
+Decisions a [DECISIONS](DECISIONS.md). Passos d'activació a [DEVELOPMENT](DEVELOPMENT.md).
 
 **Implementat** (detall a [API](API_CONTRACT.md), [MCP](MCP_CONTRACT.md),
 [DATA_MODEL](DATA_MODEL.md) i [AUTOMATIONS](AUTOMATIONS.md)):
@@ -70,12 +82,9 @@ atòmica; el resum d'un altre dia mesurava la inactivitat des d'ara.
 
 **No verificat ni executat:**
 
-- Res desplegat: ni migració 003 a Neon, ni codi nou al Worker, ni cron real.
-- El driver HTTP de Neon amb el SQL nou (provat amb `pg` sobre PostgreSQL local). Es
-  comprova amb `npm run dev:verify-neon` un cop migrat, que ara també exercita tasques,
-  notes, resum de projecte i resum diari.
+- Codi nou al Worker i cron real: no desplegats.
 - Telegram real (bot, entrega, límits) i els clients Claude reals amb les 13 eines.
-- `scripts/verify-neon.js` ampliat: només comprovada la sintaxi; no executat (token fix caducat).
+- El resum per cron i l'enviament a demanda contra Neon (només provats amb el simulador).
 
 **Limitacions que cal conèixer:** no es pot fer una còpia amb el codi nou abans d'aplicar la
 migració 003 (la còpia exigeix el ledger complet); el fitxer de còpia antic (format 1) ja no
@@ -300,7 +309,8 @@ han quedat verificades. No cal repetir ops:provision, token, backup o restore:
 aquests scripts rebutgen sobreescriure fitxers o bases ja ocupats.
 
 **Següent pas: posar en marxa D024–D026** seguint
-[DEVELOPMENT](DEVELOPMENT.md): migració 003, deploy, reconnectar clients i validar.
+[DEVELOPMENT](DEVELOPMENT.md): la migració 003 ja està aplicada; falten deploy, reconnectar
+clients i validar.
 Publicació inicial autoritzada i executada segons D021. HTTPS i `npm run dev:verify-remote` ja passen.
 No habilitar autodeploy. Les dades personals continuen prohibides.
 Guia i ordres a [DEVELOPMENT](DEVELOPMENT.md). La reconciliació documental i el
@@ -320,7 +330,8 @@ D024–D026 implementades i pujades a la branca `feat/jarvis-core` el 2026-11-25
 desplegar ni fusionar. La branca també conté el registre de la validació de Claude Code
 (`docs/claude-code-validation`), que tampoc és a main.
 
-Pendent de l'usuari, en aquest ordre: migrar (003), desplegar, reconnectar els clients,
-validar amb dades fictícies i, si vol, activar Telegram. Després: política de dades
+Migració 003 aplicada a Neon i branca pujada a GitHub el 2026-11-25. Pendent, en aquest
+ordre: desplegar el Worker, reconnectar els clients, validar amb dades fictícies i, més
+endavant, activar Telegram. Després: política de dades
 personals abans de posar-hi res real, i aprovar l'abast del bloc següent del
 [roadmap](roadmap.md) (universitat i calendari, app web, entrenaments).
