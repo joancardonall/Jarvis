@@ -83,13 +83,16 @@ corrupció, no manipulació deliberada; l'exportació no té paginació.
 | `npm run test:worker` | 1/1 en workerd, 19 eines |
 | `npm run check`, `npm run build` | Correctes |
 
-**No verificat:** cap client Claude real (web/app o Claude Code) s'ha reconnectat ni ha usat
-les 19 eines; cap crida a les eines noves pel Worker públic amb una connexió OAuth real;
-`oauth:revoke` i la purga confirmada no s'han executat contra Neon; Telegram sense configurar.
+**Verificat amb clients reals (2026-11-25):** l'usuari confirma que Claude web mostra les
+eines noves en un xat nou, sense reconnectar. Des de Claude Code, amb la connexió OAuth real i
+el Worker públic, `list_courses` retorna l'assignatura fictícia de prova amb el seu grup.
+**No verificat:** la resta d'eines noves des d'un client real (crear assignatura, lliurament,
+exportació); `oauth:revoke` i la purga confirmada contra Neon; Telegram sense configurar.
+Fusionat a main el 2026-11-25 a petició de l'usuari.
 
 **Pendent de l'usuari:** reconnectar els clients i validar les 19 eines amb dades fictícies;
 confirmar la política de dades (30 dies abans de purgar, 90 dies de còpies, dades que no s'hi
-desen); fusionar les branques a main.
+desen).
 
 ## Projectes, tasques, memòria, resum i Telegram (D024–D026) — desplegat; clients i Telegram pendents
 
