@@ -7,8 +7,8 @@ Estat executable a [CURRENT_STATE](CURRENT_STATE.md).
 
 D021: endpoint de desenvolupament publicat a
 `https://jarvis.jarvis-joancardonall.workers.dev/mcp`. Transport remot verificat amb
-el SDK oficial i el token fix; aquest Worker públic **encara no executa** el codi OAuth
-de D023. `.mcp.json` ja no porta capçalera `Authorization`: Claude Code farà OAuth pel
+el SDK oficial; des del 2026-11-24 el Worker públic executa l'OAuth de D023, verificat
+amb Claude web/app el 2026-11-25. `.mcp.json` ja no porta capçalera `Authorization`: Claude Code farà OAuth pel
 navegador. Passos i limitacions a [DEVELOPMENT](DEVELOPMENT.md).
 
 ## Úniques eines de l'increment
@@ -31,7 +31,7 @@ Proves automatitzades amb `Client` i `StreamableHTTPClientTransport` oficials,
 sense model d'IA. També es pot utilitzar MCP Inspector; procediment a
 [DEVELOPMENT](DEVELOPMENT.md). Credencials pròpies de Jarvis, mai tokens de BD.
 
-## Autenticació del client MCP (D023, implementat, no desplegat)
+## Autenticació del client MCP (D023, desplegat; Claude web/app verificat)
 
 Segueix l'especificació d'autorització MCP (2025-11-25) amb OAuth 2.1:
 
@@ -45,8 +45,8 @@ Segueix l'especificació d'autorització MCP (2025-11-25) amb OAuth 2.1:
 Endpoints i errors al [contracte API](API_CONTRACT.md); flux pas a pas a
 [ARCHITECTURE](ARCHITECTURE.md). El token fix de desenvolupament continua sent una via
 opcional per a scripts. Flux complet provat localment amb el client OAuth oficial del
-SDK MCP i GitHub simulat; **pendent** de validar amb GitHub, Claude web/app i Claude Code
-reals. Codex encara requereix validació separada.
+SDK MCP i GitHub simulat, i **verificat amb GitHub i Claude web/app reals** el 2026-11-25
+(crear en un xat, recuperar en un altre). Claude Code real pendent. Codex encara requereix validació separada.
 
 ## Regles del client conversacional (futures)
 

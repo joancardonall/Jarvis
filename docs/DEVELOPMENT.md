@@ -5,10 +5,9 @@ Aquest document és la guia d'execució. Estat i evidència a
 
 ## Autenticació OAuth amb GitHub — D023
 
-**Estat (2026-11-24): implementat i provat localment a la branca `feat/oauth-github`.
-NO desplegat i NO validat amb GitHub, Claude web/app ni Claude Code reals.** El Worker
-públic continua amb el codi anterior (només token fix). Els passos següents estan
-**PENDENTS**: no s'ha executat cap. Evidència i proves a [CURRENT_STATE](CURRENT_STATE.md);
+**Estat (2026-11-25): passos 1–8 executats per l'usuari; desplegat i verificat amb
+GitHub i Claude web/app reals. Pas 9 (Claude Code) pendent.** Els passos es conserven
+com a guia per tornar a configurar l'entorn o per a un altre entorn. Evidència i proves a [CURRENT_STATE](CURRENT_STATE.md);
 decisió a [DECISIONS](DECISIONS.md); amenaces i proteccions a [SECURITY_PRIVACY](SECURITY_PRIVACY.md).
 
 Què és: **OAuth** és un protocol estàndard perquè una aplicació (Claude) obtingui
@@ -167,7 +166,7 @@ Amb D023, `.mcp.json` només declara transport HTTP i l'URL `/mcp`: **ja no port
 capçalera `Authorization`** ni llegeix `JARVIS_BEARER_TOKEN`. Claude Code rep un 401,
 descobreix l'OAuth de Jarvis i obre el navegador per iniciar sessió amb GitHub.
 Els passos són el 9 de la [posada en marxa](#passos-de-posada-en-marxa-pendents);
-no funcionaran fins que el Worker amb D023 estigui desplegat.
+el Worker amb D023 ja està desplegat.
 
 Les instruccions anteriors (carregar `.env.client` a l'entorn abans d'iniciar
 `claude`) queden **obsoletes**. No usar `claude -p` ni executar un model

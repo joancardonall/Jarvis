@@ -1,6 +1,6 @@
 # Estat actual
 
-Actualitzat: 2026-11-24. Document principal d'estat executable i evidència.
+Actualitzat: 2026-11-25. Document principal d'estat executable i evidència.
 Visió a [PRODUCT_VISION](PRODUCT_VISION.md), motius a [DECISIONS](DECISIONS.md).
 
 ## Aprovat
@@ -16,7 +16,7 @@ D017 autoritza preparar recursos Free, migrar i provar recuperació amb dades
 fictícies. D021 autoritza publicar el Worker de desenvolupament i preparar la
 connexió amb Claude Code, ara disponible; només dades fictícies i pla Free.
 
-## OAuth amb GitHub (D023) — desplegat, pendent de clients reals
+## OAuth amb GitHub (D023) — desplegat i verificat amb Claude web/app
 
 **Posada en marxa 2026-11-24** (passos 1–7 de [DEVELOPMENT](DEVELOPMENT.md), executats
 per l'usuari; comprovacions fetes per l'agent):
@@ -30,7 +30,15 @@ per l'usuari; comprovacions fetes per l'agent):
 - Remot: salut 200; metadades RFC 8414 i RFC 9728 correctes; 401 amb `resource_metadata`;
   registre de client 201; pantalla de consentiment 200 amb casella; token falsificat 401.
 - `npm run dev:verify-remote` amb el token fix: passa (API/MCP i persistència Neon).
-- **Pendent:** login real amb GitHub i connexió de Claude web/app i Claude Code.
+- **Claude web/app real, 2026-11-25 (pas 8, executat i confirmat per l'usuari):** connector
+  nou sense capçaleres; pantalla de consentiment, casella i login amb GitHub completats;
+  connector connectat amb les dues eines visibles. En un xat s'ha creat un projecte fictici
+  (*Prova OAuth*) amb aprovació manual i **un segon xat nou l'ha recuperat per UUID**.
+  Primer flux OAuth complet amb GitHub i client reals. Captures de l'usuari; l'agent no
+  ha consultat la BD per comprovar la fila.
+- Permisos recomanats al connector: `get project` «Always allow», `create project`
+  «Needs approval» mentre no hi hagi més confiança en l'ús.
+- **Pendent:** Claude Code real (pas 9).
 
 ### Detall de la implementació (abans del desplegament)
 
@@ -56,8 +64,7 @@ l'ordre equivalent de cada script directament amb `node`):
 
 **No verificat ni executat:**
 
-- GitHub real, Claude web/app real i Claude Code real. En particular, cap navegador
-  real ha enviat encara el formulari de consentiment.
+- Claude Code real (GitHub real i Claude web/app ja verificats el 2026-11-25, vegeu a dalt).
 - `npm run test:postgres` i `npm run test:ops`: no hi ha PostgreSQL local en aquesta
   màquina. Les proves noves per a `oauth_grants` i migracions múltiples hi són però
   **no s'han executat**; `scripts/database-ops.js` i `scripts/db.js` s'han modificat sense
@@ -84,7 +91,7 @@ GitHub; un intercanvi simultani del mateix codi no revocava. Riscos residuals a
   sense verificació independent de billing. Cap upgrade activat.
 - D022 executada: token renovat el 2026-11-18, caduca el
   **2026-11-25T17:57:36.599Z**. Propietari i BD conservats; token antic rebutjat.
-  El connector de Claude web/app encara necessita actualitzar la capçalera privada.
+  Ja no cal per a Claude web/app: connecta amb OAuth (D023).
 - Secrets pujats amb JSON privat per evitar substitucions dotenv de Wrangler.
   Diagnòstic històric al [registre d'aprenentatge](learning/learning-log.md).
 - `.mcp.json` preparat amb variable d'entorn, sense token versionat.
@@ -110,8 +117,7 @@ GitHub; un intercanvi simultani del mateix codi no revocava. Riscos residuals a
   iguals a la còpia coneguda. Prova només de lectura, sense crear cap projecte.
 - Desplegament de secrets: b20f63b1-453b-4630-add2-83b2037424d3;
   versió activa al 100% indicada a l'estat operatiu. Cap canvi de codi del Worker.
-- Claude web/app: la via de la capçalera `Authorization` queda abandonada; la connexió
-  es farà amb OAuth quan D023 estigui publicada. Cap connexió real confirmada encara.
+- Claude web/app connectat amb OAuth i verificat el 2026-11-25 (vegeu D023 a dalt).
 - Token fix vigent fins al 2026-11-25T17:57:36.599Z; després només servirà OAuth,
   llevat que es torni a rotar per als scripts de verificació.
 
@@ -206,7 +212,8 @@ Els timings que Wrangler imprimeix són durada de petició, **no CPU del proveï
 - Mesura de CPU a Cloudflare: pla preparat a DEVELOPMENT, encara no executat.
 - Disponibilitat remota sostinguda, reactivació després d'inactivitat sostinguda,
   límits reals sota càrrega i clients MCP conversacionals finals pendents.
-- Windows, Inspector manual, Codex i Claude com a clients de Jarvis no verificats.
+- Windows, Inspector manual, Codex i Claude Code com a clients de Jarvis no verificats.
+  Claude web/app verificat el 2026-11-25.
 - La còpia només cobreix projects i migració coneguda: no és pg_dump complet,
   recuperació del compte ni política de còpies per dades personals. No hi ha
   xifrat propi, retenció automatitzada ni còpia fora del dispositiu provats.
@@ -220,9 +227,9 @@ La preparació Free, migració, persistència i restauració remotes de l'increm
 han quedat verificades. No cal repetir ops:provision, token, backup o restore:
 aquests scripts rebutgen sobreescriure fitxers o bases ja ocupats.
 
-**Següent pas: acabar la posada en marxa de D023.** Passos 1–7 de
-[DEVELOPMENT](DEVELOPMENT.md#autenticació-oauth-amb-github--d023) fets; queden el 8 i el 9
-(connectar Claude web/app i Claude Code amb login real de GitHub) i registrar aquí el resultat. Després: mesurar el consum de CPU.
+**Següent pas: connectar Claude Code** (pas 9 de
+[DEVELOPMENT](DEVELOPMENT.md#autenticació-oauth-amb-github--d023)); passos 1–8 fets i
+Claude web/app verificat. Fusionar `feat/oauth-github` a main requereix aprovació de l'usuari. Després: mesurar el consum de CPU.
 Publicació inicial autoritzada i executada segons D021. HTTPS i `npm run dev:verify-remote` ja passen.
 No habilitar autodeploy. Les dades personals continuen prohibides.
 Guia i ordres a [DEVELOPMENT](DEVELOPMENT.md). La reconciliació documental i el
@@ -238,6 +245,6 @@ web i proactivitat per Telegram continuen a la [visió](PRODUCT_VISION.md) i el
 
 ## Punt de represa
 
-D023 publicada el 2026-11-24 des de la branca `feat/oauth-github` (sense fusionar a main).
-Pendent: passos 8–9 (connectar Claude web/app i Claude Code amb login real de GitHub)
-i registrar-ne el resultat aquí.
+D023 publicada el 2026-11-24 des de la branca `feat/oauth-github` (sense fusionar a main)
+i verificada amb Claude web/app el 2026-11-25. Pendent: Claude Code (pas 9), decidir la
+fusió a main i, després, aprovar l'abast de `list_projects`.

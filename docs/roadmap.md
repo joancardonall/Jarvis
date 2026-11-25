@@ -1,16 +1,16 @@
 # Full de ruta orientat a experiments
 
-## Estat actual — 2026-11-24
+## Estat actual — 2026-11-25
 
-D023 (OAuth 2.1 amb GitHub per als connectors de Claude) està **aprovada i
-implementada** a la branca `feat/oauth-github`, amb proves locals i GitHub simulat.
-**Pendent:** desplegament i validació amb clients reals. El Worker públic continua
-amb el codi anterior (token fix, D021–D022). La mesura de CPU continua pendent.
+D023 (OAuth 2.1 amb GitHub per als connectors de Claude) està **desplegada** des de la
+branca `feat/oauth-github` i **verificada amb Claude web/app**: crear en un xat i
+recuperar en un altre funciona. Pendent: Claude Code i fusió a main. La mesura de CPU
+continua pendent.
 
 Ordre proposat per als següents increments:
 
-1. Desplegar D023 i validar-la amb Claude web/app i Claude Code
-   ([passos](DEVELOPMENT.md#autenticació-oauth-amb-github--d023)).
+1. Validar D023 amb Claude Code ([pas 9](DEVELOPMENT.md#autenticació-oauth-amb-github--d023))
+   i fusionar la branca a main amb aprovació.
 2. `list_projects`.
 3. Tasques.
 4. Resum per Telegram.
@@ -33,7 +33,7 @@ Estat executable i verificacions a [CURRENT_STATE.md](CURRENT_STATE.md).
 ## Fase 1 — Circuit complet de projectes (objectiu futur)
 
 - Projectes, tasques i decisions persistents.
-- API i MCP autenticats (OAuth amb GitHub, D023, pendent de desplegar) amb 4–8 eines
+- API i MCP autenticats (OAuth amb GitHub, D023, desplegat; Claude web/app verificat) amb 4–8 eines
   essencials.
 - Vista web mínima per comprovar dades (no dashboard extens).
 - Crear des de Codex, recuperar en xat nou, modificar i verificar persistència.
@@ -72,4 +72,4 @@ Estat executable i verificacions a [CURRENT_STATE.md](CURRENT_STATE.md).
 Chatbot propi, multiagents, RAG vectorial, sincronització genèrica universal, automatitzacions amb LLM sempre actiu.
 
 Client inicial: Codex segons D010; Claude Code i Claude web/app amb OAuth
-segons D023, pendents de desplegament i validació real.
+segons D023: Claude web/app verificat el 2026-11-25; Claude Code pendent.

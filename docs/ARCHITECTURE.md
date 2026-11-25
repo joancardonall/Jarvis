@@ -2,8 +2,8 @@
 
 **Aprovada:** D011–D014 i D023 (inici de sessió OAuth amb GitHub) a [DECISIONS](DECISIONS.md).
 Evidència i limitacions a [CURRENT_STATE](CURRENT_STATE.md). Aquest document explica
-l'estructura, no certifica desplegament: el codi OAuth (D023) està **implementat i provat
-localment**, però el Worker públic encara no l'executa.
+l'estructura, no certifica desplegament. El codi OAuth (D023) està publicat al Worker
+des del 2026-11-24 i verificat amb Claude web/app.
 
 ```mermaid
 flowchart TD
@@ -62,7 +62,7 @@ El servei compara empremtes i retorna conflicte si el contingut és diferent.
 Això funciona amb concurrència entre instàncies sense memòria compartida.
 No actualitza `updated_at` en reintents. Sense clau, PostgreSQL admet múltiples NULL.
 
-## Flux d'inici de sessió OAuth (D023, implementat, no desplegat)
+## Flux d'inici de sessió OAuth (D023, desplegat, verificat amb Claude web/app)
 
 Exemple: connectar Claude web a Jarvis. Contracte HTTP de cada pas a
 [API_CONTRACT](API_CONTRACT.md); amenaces i proteccions a [SECURITY_PRIVACY](SECURITY_PRIVACY.md).

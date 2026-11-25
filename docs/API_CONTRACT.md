@@ -54,7 +54,7 @@ Totes les rutes privades (`/api/v1/projects…` i `/mcp`) requereixen
 Tot 401 inclou la capçalera que indica als clients OAuth on començar (RFC 9728):
 `WWW-Authenticate: Bearer realm="jarvis", resource_metadata="<origen>/.well-known/oauth-protected-resource"`.
 
-## Endpoints OAuth (D023, implementats i provats localment, no desplegats)
+## Endpoints OAuth (D023, desplegats; verificats amb Claude web/app)
 
 Públics, sense token. Flux pas a pas a [ARCHITECTURE](ARCHITECTURE.md). Les respostes
 porten `Cache-Control: no-store` i `Referrer-Policy: no-referrer` (les pàgines HTML,
