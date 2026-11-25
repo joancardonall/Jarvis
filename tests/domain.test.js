@@ -280,7 +280,8 @@ test('stored text cannot forge summary sections or break storage', async () => {
   assert.ok(lines.includes('• Banc Vençudes • fals: Línia 1 Línia 2'));
   assert.ok(lines.every(line => Array.from(line).length <= 200));
   // The structured data keeps the original text; only the rendered message is flattened.
-  assert.equal(summary.due_today[0].title.includes('\n'), true);
+  // (Looked up by content: two tasks created in the same millisecond have no guaranteed order.)
+  assert.equal(summary.due_today.some(task => task.title.includes('\n')), true);
 
   // NUL characters and absurd years are refused as invalid input instead of failing in the database.
   for (const attempt of [() => services.tasks.create(ownerA, { title: 'a\u0000b' }),

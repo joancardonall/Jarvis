@@ -21,14 +21,26 @@ connexió amb Claude Code, ara disponible; només dades fictícies i pla Free.
 ## Resum en una frase
 
 **Publicat i verificat:** crear i recuperar projectes amb OAuth de GitHub (D023), des de Claude
-web/app i Claude Code. **Implementat però no publicat:** llistar i editar projectes, tasques,
-notes, resum diari i Telegram (D024–D026), a la branca `feat/jarvis-core`.
+web/app i Claude Code. **Publicat el 2026-11-25, pendent de validar amb els clients:** llistar i editar projectes,
+tasques, notes i resum diari (D024–D026). Telegram implementat però no configurat.
 
-## Projectes, tasques, memòria, resum i Telegram (D024–D026) — BD migrada, Worker NO desplegat
+## Projectes, tasques, memòria, resum i Telegram (D024–D026) — desplegat; clients i Telegram pendents
 
 Aprovat per l'usuari el 2026-11-25 com a llista de deu increments a fer sense interrupcions.
 No autoritzat: desplegar, migrar la BD real, fusionar a main ni dades personals reals.
-**El Worker públic continua exposant només les 2 eines de D023.**
+**Worker publicat el 2026-11-25** (autoritzat per l'usuari; executat per l'agent des de la
+branca `feat/jarvis-core`): versió **`962035a5-07aa-4cc5-84cf-fc66fb0367f3`**, missatge
+`D024 tasks, notes and daily summary`, cron `30 5-8 * * *` registrat.
+- Des de fora: salut 200, `/mcp` sense token 401, metadades OAuth 200, token falsificat 401.
+- Amb la connexió OAuth real de Claude Code: `get_project` retorna el projecte de prova amb
+  els camps nous (`priority`, `last_activity_at`): el codi nou llegeix la BD migrada.
+- **Incident del desplegament:** l'ordre va encadenar proves i deploy, una prova va fallar
+  de manera intermitent i el deploy es va executar igualment. Causa: la prova suposava un
+  ordre entre dues tasques creades en el mateix mil·lisegon; el codi publicat era correcte.
+  Prova corregida (12 execucions seguides sense fallada). Lliçó: comprovar el resultat de
+  les proves abans de desplegar, en una ordre separada.
+- **Pendent:** que Claude web/app i Claude Code es reconnectin per veure les 13 eines (aquesta
+  sessió encara en veu 2) i provar-les; Telegram sense configurar, el cron no envia res.
 
 **Base de dades real, 2026-11-25** (autoritzat per l'usuari; executat per l'agent):
 - `npm run db:migrate`: *Migrations 001-003 and runtime table grants verified.*
@@ -40,7 +52,6 @@ No autoritzat: desplegar, migrar la BD real, fusionar a main ni dades personals 
 - `npm run dev:verify-neon`: **passa**. Prova des de Node, amb el **driver HTTP real de Neon**,
   projectes, tasques, notes, resum de projecte i resum diari. Ha deixat una tasca i una nota
   fictícies amb claus estables al projecte de prova.
-- El Worker antic continua funcionant sobre l'esquema nou (comprovat: salut i 401 correctes).
 
 Decisions a [DECISIONS](DECISIONS.md). Passos d'activació a [DEVELOPMENT](DEVELOPMENT.md).
 
@@ -82,7 +93,7 @@ atòmica; el resum d'un altre dia mesurava la inactivitat des d'ara.
 
 **No verificat ni executat:**
 
-- Codi nou al Worker i cron real: no desplegats.
+- Cron real: registrat però mai observat en execució.
 - Telegram real (bot, entrega, límits) i els clients Claude reals amb les 13 eines.
 - El resum per cron i l'enviament a demanda contra Neon (només provats amb el simulador).
 
@@ -309,8 +320,7 @@ han quedat verificades. No cal repetir ops:provision, token, backup o restore:
 aquests scripts rebutgen sobreescriure fitxers o bases ja ocupats.
 
 **Següent pas: posar en marxa D024–D026** seguint
-[DEVELOPMENT](DEVELOPMENT.md): la migració 003 ja està aplicada; falten deploy, reconnectar
-clients i validar.
+[DEVELOPMENT](DEVELOPMENT.md): migració i deploy fets; falta reconnectar clients i validar.
 Publicació inicial autoritzada i executada segons D021. HTTPS i `npm run dev:verify-remote` ja passen.
 No habilitar autodeploy. Les dades personals continuen prohibides.
 Guia i ordres a [DEVELOPMENT](DEVELOPMENT.md). La reconciliació documental i el
@@ -330,8 +340,7 @@ D024–D026 implementades i pujades a la branca `feat/jarvis-core` el 2026-11-25
 desplegar ni fusionar. La branca també conté el registre de la validació de Claude Code
 (`docs/claude-code-validation`), que tampoc és a main.
 
-Migració 003 aplicada a Neon i branca pujada a GitHub el 2026-11-25. Pendent, en aquest
-ordre: desplegar el Worker, reconnectar els clients, validar amb dades fictícies i, més
-endavant, activar Telegram. Després: política de dades
+Migració 003 aplicada, Worker desplegat i branca pujada el 2026-11-25. Pendent: reconnectar
+els clients, validar les 13 eines amb dades fictícies i, més endavant, activar Telegram. Després: política de dades
 personals abans de posar-hi res real, i aprovar l'abast del bloc següent del
 [roadmap](roadmap.md) (universitat i calendari, app web, entrenaments).
