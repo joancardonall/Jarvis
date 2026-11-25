@@ -9,9 +9,9 @@ continua pendent.
 
 Ordre proposat per als següents increments:
 
-2. `list_projects`.
-3. Tasques.
-4. Resum per Telegram.
+1. `list_projects`.
+2. Tasques.
+3. Resum per Telegram.
 
 Cada implementació necessita aprovació del seu abast.
 
