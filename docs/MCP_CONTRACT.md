@@ -46,7 +46,7 @@ Endpoints i errors al [contracte API](API_CONTRACT.md); flux pas a pas a
 [ARCHITECTURE](ARCHITECTURE.md). El token fix de desenvolupament continua sent una via
 opcional per a scripts. Flux complet provat localment amb el client OAuth oficial del
 SDK MCP i GitHub simulat, i **verificat amb GitHub i Claude web/app reals** el 2026-11-25
-(crear en un xat, recuperar en un altre). Claude Code real pendent. Codex encara requereix validació separada.
+(crear en un xat, recuperar en un altre). Claude Code real verificat el mateix dia. Codex encara requereix validació separada.
 
 ## Regles del client conversacional (futures)
 

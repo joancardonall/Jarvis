@@ -26,7 +26,7 @@ Les proves PostgreSQL dedicades i la configuració d'execució estan a la
 [guia de desenvolupament](docs/DEVELOPMENT.md). Neon Frankfurt/Free, permisos, persistència i restauració de desenvolupament
 estan verificats, inclòs Worker local→Neon. Worker publicat segons D021; HTTPS i circuit API/MCP→Neon remots verificats.
 L'OAuth amb GitHub (D023) està desplegat i verificat amb Claude web/app: crear un
-projecte en un xat i recuperar-lo en un altre funciona. Claude Code i Codex pendents. `npm run dev`
+projecte en un xat i recuperar-lo en un altre funciona. Claude Code també verificat; Codex pendent. `npm run dev`
 arrenca en loopback; sense secrets, només salut és operativa.
 
 ## Documents principals

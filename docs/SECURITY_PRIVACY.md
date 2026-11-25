@@ -3,7 +3,7 @@
 ## Autenticació: OAuth 2.1 amb GitHub (D023)
 
 **Estat:** desplegat el 2026-11-24 i verificat amb GitHub i Claude web/app reals el
-2026-11-25; Claude Code pendent. Els controls del model d'amenaces s'han provat amb
+2026-11-25, i amb Claude Code el mateix dia. Els controls del model d'amenaces s'han provat amb
 simuladors, no amb atacs reals. Evidència a [CURRENT_STATE](CURRENT_STATE.md), flux a
 [ARCHITECTURE](ARCHITECTURE.md), contracte a [API_CONTRACT](API_CONTRACT.md).
 

@@ -16,7 +16,7 @@ D017 autoritza preparar recursos Free, migrar i provar recuperació amb dades
 fictícies. D021 autoritza publicar el Worker de desenvolupament i preparar la
 connexió amb Claude Code, ara disponible; només dades fictícies i pla Free.
 
-## OAuth amb GitHub (D023) — desplegat i verificat amb Claude web/app
+## OAuth amb GitHub (D023) — desplegat i verificat amb Claude web/app i Claude Code
 
 **Posada en marxa 2026-11-24** (passos 1–7 de [DEVELOPMENT](DEVELOPMENT.md), executats
 per l'usuari; comprovacions fetes per l'agent):
@@ -38,7 +38,13 @@ per l'usuari; comprovacions fetes per l'agent):
   ha consultat la BD per comprovar la fila.
 - Permisos recomanats al connector: `get project` «Always allow», `create project`
   «Needs approval» mentre no hi hagi més confiança en l'ús.
-- **Pendent:** Claude Code real (pas 9).
+- **Claude Code real, 2026-11-25 (pas 9):** extensió de VS Code; l'usuari ha autenticat el
+  servidor `jarvis` de `.mcp.json` amb `/mcp` (login GitHub, retorn loopback). L'agent ha
+  cridat les eines d'aquest servidor (no les del connector de claude.ai): creat el projecte
+  fictici `09795485-89ba-4bc8-a75b-75154f33e01a` amb clau `d023-claude-code-validation` i
+  recuperat per UUID amb el mateix contingut i dates. Posada en marxa de D023 completa.
+- Claude Code també hereta el connector de claude.ai: hi ha dues connexions a Jarvis i
+  les eines surten duplicades. Decidir-ne una queda pendent.
 
 ### Detall de la implementació (abans del desplegament)
 
@@ -66,7 +72,7 @@ l'ordre equivalent de cada script directament amb `node`):
 
 **No verificat ni executat:**
 
-- Claude Code real (GitHub real i Claude web/app ja verificats el 2026-11-25, vegeu a dalt).
+- Cap pendent de clients Claude: GitHub, Claude web/app i Claude Code verificats el 2026-11-25.
 - `npm run test:postgres` i `npm run test:ops`: no hi ha PostgreSQL local en aquesta
   màquina. Les proves noves per a `oauth_grants` i migracions múltiples hi són però
   **no s'han executat**; `scripts/database-ops.js` i `scripts/db.js` s'han modificat sense
@@ -214,8 +220,8 @@ Els timings que Wrangler imprimeix són durada de petició, **no CPU del proveï
 - Mesura de CPU a Cloudflare: pla preparat a DEVELOPMENT, encara no executat.
 - Disponibilitat remota sostinguda, reactivació després d'inactivitat sostinguda,
   límits reals sota càrrega i clients MCP conversacionals finals pendents.
-- Windows, Inspector manual, Codex i Claude Code com a clients de Jarvis no verificats.
-  Claude web/app verificat el 2026-11-25.
+- Windows, Inspector manual i Codex com a clients de Jarvis no verificats.
+  Claude web/app i Claude Code verificats el 2026-11-25.
 - La còpia només cobreix projects i migració coneguda: no és pg_dump complet,
   recuperació del compte ni política de còpies per dades personals. No hi ha
   xifrat propi, retenció automatitzada ni còpia fora del dispositiu provats.
@@ -229,9 +235,8 @@ La preparació Free, migració, persistència i restauració remotes de l'increm
 han quedat verificades. No cal repetir ops:provision, token, backup o restore:
 aquests scripts rebutgen sobreescriure fitxers o bases ja ocupats.
 
-**Següent pas: connectar Claude Code** (pas 9 de
-[DEVELOPMENT](DEVELOPMENT.md#autenticació-oauth-amb-github--d023)); passos 1–8 fets i
-Claude web/app verificat. Després: mesurar el consum de CPU.
+**Següent pas: proposar i aprovar l'abast de `list_projects`.** La posada en marxa de
+D023 és completa (passos 1–9 de [DEVELOPMENT](DEVELOPMENT.md#autenticació-oauth-amb-github--d023)). Després: mesurar el consum de CPU.
 Publicació inicial autoritzada i executada segons D021. HTTPS i `npm run dev:verify-remote` ja passen.
 No habilitar autodeploy. Les dades personals continuen prohibides.
 Guia i ordres a [DEVELOPMENT](DEVELOPMENT.md). La reconciliació documental i el
@@ -248,4 +253,5 @@ web i proactivitat per Telegram continuen a la [visió](PRODUCT_VISION.md) i el
 ## Punt de represa
 
 D023 publicada el 2026-11-24, verificada amb Claude web/app i fusionada a main el
-2026-11-25. Pendent: Claude Code (pas 9) i, després, aprovar l'abast de `list_projects`.
+2026-11-25; Claude Code verificat el mateix dia. Pendent: triar una sola connexió a Jarvis
+dins de Claude Code i aprovar l'abast de `list_projects`.

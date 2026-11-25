@@ -6,7 +6,7 @@ Aquest document és la guia d'execució. Estat i evidència a
 ## Autenticació OAuth amb GitHub — D023
 
 **Estat (2026-11-25): passos 1–8 executats per l'usuari; desplegat i verificat amb
-GitHub i Claude web/app reals. Pas 9 (Claude Code) pendent.** Els passos es conserven
+GitHub, Claude web/app i Claude Code reals (tots nou passos fets).** Els passos es conserven
 com a guia per tornar a configurar l'entorn o per a un altre entorn. Evidència i proves a [CURRENT_STATE](CURRENT_STATE.md);
 decisió a [DECISIONS](DECISIONS.md); amenaces i proteccions a [SECURITY_PRIVACY](SECURITY_PRIVACY.md).
 
@@ -173,7 +173,7 @@ Les instruccions anteriors (carregar `.env.client` a l'entorn abans d'iniciar
 automàticament per comprovar-ho. Amb l'eina connectada, crear un projecte fictici
 amb clau estable i recuperar-lo pel seu UUID en una conversa nova. Sense resposta
 d'èxit de l'eina, no considerar-lo desat. No donar permisos generals d'escriptura
-automàtica. Client real encara no validat.
+automàtica. Validat amb l'extensió de VS Code el 2026-11-25 (evidència a CURRENT_STATE).
 
 ### Claude web/app (connector remot)
 
