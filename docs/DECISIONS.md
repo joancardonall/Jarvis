@@ -348,8 +348,8 @@ en clar: no és una política de còpies per a dades personals.
 ## D027 — Política de dades personals: esborrat en dos temps, exportació i connexions — 2026-11-25
 
 **Estat:** l'usuari va demanar el 2026-11-25 continuar amb aquest bloc. Els **mecanismes estan
-implementats i provats localment; no desplegats**. Els **valors de la política són una
-proposta**: l'usuari els ha de confirmar abans de desar-hi dades personals reals.
+implementats i desplegats** des del 2026-11-25 (migració 004 a Neon, Worker publicat), pendents
+de validar amb clients reals. Els **valors de la política són una proposta**: l'usuari els ha de confirmar abans de desar-hi dades personals reals.
 Política completa a [SECURITY_PRIVACY](SECURITY_PRIVACY.md); ordres a [DEVELOPMENT](DEVELOPMENT.md).
 **Context:** des de D024 Jarvis pot contenir informació personal, però «oblidar» només
 amagava i no hi havia manera d'esborrar de debò, d'exportar les dades ni de veure o tancar
@@ -383,8 +383,8 @@ de lectura però ho retorna tot, i convé deixar-la amb confirmació als clients
 
 ## D028 — Universitat: assignatures, grups i lliuraments — 2026-11-25
 
-**Estat:** demanada per l'usuari el 2026-11-25. **Implementada i provada localment; no
-desplegada.** Contractes a [API_CONTRACT](API_CONTRACT.md) i [MCP_CONTRACT](MCP_CONTRACT.md).
+**Estat:** demanada per l'usuari el 2026-11-25. **Implementada i desplegada el 2026-11-25**
+(migració 004 a Neon, verificada des de Node); pendent de validar amb clients reals. Contractes a [API_CONTRACT](API_CONTRACT.md) i [MCP_CONTRACT](MCP_CONTRACT.md).
 **Decisió:** assignatures amb codi, període i notes; grups per assignatura (teoria,
 seminari, laboratori, altres) amb professor, horari i lloc. **Un lliurament o un examen és
 una tasca lligada a l'assignatura, i el context acadèmic són notes lligades a

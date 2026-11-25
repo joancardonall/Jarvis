@@ -348,6 +348,10 @@ eines); `check` i `build`. **No verificat:** res d'això sobre Neon ni desplegat
 i `oauth:revoke` només provades com a funcions sobre PostgreSQL local, no com a ordres contra
 Neon; clients Claude reals amb les 19 eines. Limitacions: sense horari estructurat ni notes
 d'avaluació, sense Calendar, les còpies no es purguen soles i la política espera confirmació.
+**Posada en marxa (2026-11-25):** migració 004 a Neon i `db:verify` correctes, còpia format 3,
+`dev:verify-neon` ampliat passa (driver real de Neon, des de Node), purga en previsualització
+(tot a 0) i `oauth:connections` contra Neon; Worker desplegat (versió `2c87252d`, 19 eines).
+Pendent: clients Claude reals amb les 19 eines i confirmar la política.
 
 Preguntes de comprensió:
 1. Per què el Worker no pot esborrar res encara que Claude li ho demani?

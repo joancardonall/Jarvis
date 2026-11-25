@@ -61,10 +61,11 @@ Cada fila té prova automatitzada a `tests/oauth.test.js` o `tests/grant-storage
   un agent independent el 2026-11-24, no auditat professionalment.
 - Variant `claude.com` del callback acceptada sense confirmació oficial que s'usi.
 
-Limitacions afegides per D024–D026 (no desplegat):
+Limitacions afegides per D024–D026 (desplegat el 2026-11-25):
 
-- **Sense esborrat real ni exportació per l'usuari:** «oblidar» desactiva; les dades queden a
-  Neon i a les còpies. Cal una política de dades personals abans de dades reals.
+- **«Oblidar» només desactiva:** les dades queden a Neon i a les còpies fins que el
+  desenvolupador les purga. L'exportació i l'esborrat real existeixen des de D027 (vegeu més
+  avall); la política de dades s'ha de confirmar abans de dades reals.
 - **Telegram és un tercer:** els títols del resum hi viatgen en text pla; Telegram real no
   s'ha provat.
 - **Injecció d'instruccions** des de notes desades: mitigada només amb l'aprovació manual de
@@ -76,7 +77,7 @@ Limitacions afegides per D024–D026 (no desplegat):
 ## Projectes, tasques, notes i Telegram (D024–D026)
 
 **Estat:** implementat i provat localment (simuladors i PostgreSQL local) a la branca
-`feat/jarvis-core`; **no desplegat**. Migració 003 no aplicada a Neon; Telegram real i el
+`feat/jarvis-core`; **desplegat el 2026-11-25** (migració 003 a Neon). Telegram real i el
 Cron Trigger real no provats. Evidència a [CURRENT_STATE](CURRENT_STATE.md), decisions a
 [DECISIONS](DECISIONS.md), dades a [DATA_MODEL](DATA_MODEL.md), passos a
 [DEVELOPMENT](DEVELOPMENT.md#tasques-notes-i-resum-diari--d024d026).
@@ -189,7 +190,8 @@ localment i sobre Neon en BD separada; no equival a recuperació completa del co
 
 ## Política de dades personals (D027) — proposada, pendent de confirmació
 
-**Estat:** els mecanismes estan implementats i provats localment, **no desplegats**. Els
+**Estat:** els mecanismes estan implementats i **desplegats** des del 2026-11-25; contra Neon
+només s'ha executat la purga en previsualització (res esborrat) i el llistat de connexions. Els
 valors (què es pot desar, terminis) són una proposta. **Fins que l'usuari la confirmi,
 Jarvis només ha de contenir dades fictícies.**
 

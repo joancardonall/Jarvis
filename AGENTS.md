@@ -132,12 +132,13 @@ entrenaments, integracions i seguiment proactiu per Telegram.
 
 ## Increment actual i següent tasca
 
-Desplegat i en ús: OAuth amb GitHub (D023) i el circuit de projectes, tasques, memòria i
-resum diari (D024–D026). Implementat a la branca `feat/data-policy-university`, pendent de
-desplegar: política de dades amb exportació, purga i gestió de connexions (D027) i
-universitat (D028). **Següent tasca:** posar en marxa D027–D028 seguint
-`docs/DEVELOPMENT.md` i validar-ho amb els clients reals. Publicar, pujar secrets, migrar la
-BD real i fusionar a main els executa o els confirma l'usuari.
+Desplegat (2026-11-25): OAuth amb GitHub (D023), el circuit de projectes, tasques, memòria i
+resum diari (D024–D026), i la política de dades amb exportació, purga i gestió de connexions
+(D027) i universitat (D028), des de la branca `feat/data-policy-university` (no fusionada).
+**Següent tasca:** reconnectar Claude web/app i Claude Code, validar les 19 eines amb dades
+fictícies seguint `docs/DEVELOPMENT.md` i que l'usuari confirmi la política de dades (D027).
+Publicar, pujar secrets, migrar la BD real i fusionar a main els executa o els confirma
+l'usuari.
 
 Regles que s'han de mantenir en qualsevol canvi:
 - El rol del Worker no esborra mai files ni en canvia el propietari. L'esborrat definitiu

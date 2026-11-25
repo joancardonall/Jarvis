@@ -1,9 +1,9 @@
 # Casos d'ús i acceptació
 
 Aquests casos descriuen la visió completa. Cada cas indica què cobreixen les eines MCP.
-Les 13 de D023–D026 estan **desplegades** des del 2026-11-25, però cap client Claude real
-les ha provat encara (falta reconnectar-los). Les 6 de D027–D028 (assignatures i
-exportació) estan **implementades i provades localment, no desplegades**. Vegeu
+Les 19 eines (13 de D023–D026 i 6 de D027–D028, assignatures i exportació) estan
+**desplegades** des del 2026-11-25, però cap client Claude real les ha provat encara (falta
+reconnectar-los). Vegeu
 [CURRENT_STATE](CURRENT_STATE.md) i el [contracte MCP](MCP_CONTRACT.md).
 
 ## UC-01 — Crear un projecte conversant
@@ -36,7 +36,7 @@ Usuari: «A Sistemes Operatius ens han posat una pràctica per al dia 20.»
 
 Esperat: identifica l'assignatura si és inequívoca, crea tasca amb venciment, ofereix crear esdeveniment si la intenció d'agendar no és clara; si l'usuari demana explícitament agendar, utilitza Calendar i confirma resultat. En dates ambigües, pregunta.
 
-**Estat:** cobert al codi sense Calendar, no desplegat. `list_courses` troba l'assignatura
+**Estat:** cobert sense Calendar, desplegat i pendent de validar amb un client real. `list_courses` troba l'assignatura
 (pel nom o el codi) i `create_task` amb `course_id` i `due_date` crea el lliurament, que
 surt al resum diari amb el nom de l'assignatura. Falta Calendar (crear l'esdeveniment).
 
@@ -46,7 +46,7 @@ Usuari: «Qui em fa el seminari de X?»
 
 Esperat: consulta dades d'assignatures, grups i professorat. Si falta informació, ho diu i permet guardar-la.
 
-**Estat:** cobert al codi, no desplegat. `list_courses` (o `get_course_overview`) retorna
+**Estat:** cobert, desplegat i pendent de validar amb un client real. `list_courses` (o `get_course_overview`) retorna
 els grups amb professor, horari i lloc; si falta, `save_course_group` el desa o
 l'actualitza (seminari «S102»). El context acadèmic va a notes amb `course_id`.
 
@@ -88,7 +88,7 @@ Usuari: «Recorda que prefereixo X» / «Oblida X».
 
 Esperat: operació MCP d'alta/actualització/desactivació amb confirmació; per a eliminacions destructives, confirmar segons política. Mai afirmar que s'ha desat sense resposta satisfactòria.
 
-**Estat:** cobert per `save_note` (`preference`) i `update_note` (`status: inactive` per oblidar, reversible). L'esborrat real no el fa el model: passat el període de retenció (30 dies per defecte), el desenvolupador purga les notes oblidades amb `npm run data:purge` (D027, al codi, no provat contra Neon).
+**Estat:** cobert per `save_note` (`preference`) i `update_note` (`status: inactive` per oblidar, reversible). L'esborrat real no el fa el model: passat el període de retenció (30 dies per defecte), el desenvolupador purga les notes oblidades amb `npm run data:purge` (D027, desplegat; contra Neon només s'ha executat la previsualització, sense esborrar res).
 
 ## Validació transversal
 

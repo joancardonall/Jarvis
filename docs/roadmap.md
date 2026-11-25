@@ -12,15 +12,15 @@ web/app i Claude Code es reconnectin i provin les 13 eines, i configurar i valid
 (sense Telegram, el cron no envia res).
 
 D027–D028 (política de dades amb exportació, purga i gestió de connexions OAuth, còpia
-format 3, i assignatures amb grups, lliuraments i notes acadèmiques) estan **implementades a
-la branca `feat/data-policy-university` i provades localment** amb simuladors i PostgreSQL
-local. **Pendents:** el desplegament (la migració 004 no s'ha aplicat a Neon) i que l'usuari
-confirmi la política de dades, que ara és una proposta amb valors per defecte. Fins llavors,
-només dades fictícies.
+format 3, i assignatures amb grups, lliuraments i notes acadèmiques) estan **desplegades**
+des del 2026-11-25 des de la branca `feat/data-policy-university` (no fusionada): migració
+004 aplicada a Neon i Worker publicat amb 19 eines. **Pendents:** que Claude web/app i Claude
+Code es reconnectin i provin les 19 eines, i que l'usuari confirmi la política de dades, que
+ara és una proposta amb valors per defecte. Fins llavors, només dades fictícies.
 
 Ordre dels increments que queden (segons el pla de producte):
 
-1. Desplegar D027–D028 i validar-les amb Claude web i Claude Code reals; confirmar la
+1. Validar D027–D028 (ja desplegades) amb Claude web i Claude Code reals; confirmar la
    política de dades abans de posar-hi dades reals (passos a
    [DEVELOPMENT](DEVELOPMENT.md#política-de-dades-i-universitat--d027d028)).
 2. Google Calendar dins del resum diari.
@@ -77,9 +77,10 @@ Estat executable i verificacions a [CURRENT_STATE.md](CURRENT_STATE.md).
 
 ## Fase 3 — Universitat i Calendar
 
-- Model mínim d'assignatures, grups, professors i treballs: **fet en codi** (D028:
+- Model mínim d'assignatures, grups, professors i treballs: **fet** (D028:
   assignatures, grups per tipus i etiqueta, lliuraments i exàmens com a tasques, context
-  acadèmic com a notes, al resum diari amb el nom de l'assignatura); **pendent de desplegar**.
+  acadèmic com a notes, al resum diari amb el nom de l'assignatura); **desplegat** el
+  2026-11-25, pendent de validar amb clients reals.
   Sense horari estructurat ni qualificacions.
 - Accions conversacionals via connector Calendar; integració backend separada si cal per als
   resums: **pendent** (següent increment).

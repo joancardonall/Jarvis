@@ -2,17 +2,17 @@
 
 **Aprovada:** D011–D014, D023 (inici de sessió OAuth amb GitHub) i D024–D026 (projectes,
 tasques, notes, resum diari, Telegram i còpia format 2) a [DECISIONS](DECISIONS.md).
-D027 (política de dades) i D028 (universitat) són **implementades al codi**; D027 és una
-proposta amb valors per defecte pendent de confirmar per l'usuari.
+D027 (política de dades) i D028 (universitat) són **implementades i desplegades**; D027 és
+una proposta amb valors per defecte pendent de confirmar per l'usuari.
 Evidència i limitacions a [CURRENT_STATE](CURRENT_STATE.md). Aquest document explica
 l'estructura, no certifica desplegament.
 
 - **Desplegat:** D023 (des del 2026-11-24, verificat amb Claude web/app i Claude Code) i
-  D024–D026 (migració 003 a Neon i Worker publicat el 2026-11-25, 13 eines i cron
-  registrat). Falta que els clients Claude reals provin les 13 eines; Telegram no està
-  configurat.
-- **Implementat i provat localment, no desplegat:** D027–D028 (assignatures, exportació,
-  purga, gestió de connexions i còpia format 3; 19 eines). La migració 004 no és a Neon.
+  D024–D026 (migració 003 a Neon i Worker publicat el 2026-11-25, cron registrat) i
+  D027–D028 (assignatures, exportació, purga, gestió de connexions i còpia format 3;
+  migració 004 a Neon i Worker publicat el 2026-11-25, 19 eines).
+- **Pendent:** que els clients Claude reals es reconnectin i provin les 19 eines; Telegram
+  no està configurat.
 
 ```mermaid
 flowchart TD
@@ -54,7 +54,7 @@ hi ha secrets configurats.
   `/mcp` a `mcp.js` i la resta a `api.js`. També exporta `scheduled`, que crida el cron.
 - `src/api.js`: adaptador HTTP de les rutes `/api/v1/…` cap als serveis.
 - `src/mcp.js`: servidor i transport oficial; registre de les 19 eines sobre els mateixos serveis
-  (13 de desplegades i 6 de D027–D028 només al codi).
+  (13 de D023–D026 i 6 de D027–D028, totes desplegades).
 - `src/services.js`: munta tots els serveis sobre un sol repository i afegeix la vista
   conjunta d'un projecte (`overview`) i l'**exportació** (`exportData`): tot el que Jarvis
   guarda del propietari, inclosos arxivats i inactius, en la mateixa forma pública.
@@ -195,8 +195,8 @@ El propietari de les dades continua sent `DEV_OWNER_ID`: el login no crea usuari
 
 ## Decisions de simplicitat
 
-SQL explícit i poques taules de domini (`projects`, `tasks`, `notes`, i al codi
-`courses` i `course_groups`) més dues d'estat operatiu (`oauth_grants`, `summary_runs`).
+SQL explícit i poques taules de domini (`projects`, `tasks`, `notes`, `courses` i
+`course_groups`) més dues d'estat operatiu (`oauth_grants`, `summary_runs`).
 L'aplicació no esborra res: projectes i assignatures s'arxiven, les tasques es cancel·len
 i notes i grups es desactiven. L'esborrat definitiu el fa només el desenvolupador amb
 `npm run data:purge` (D027, cicle de vida a [DATA_MODEL](DATA_MODEL.md)), de manera que un

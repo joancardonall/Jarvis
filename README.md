@@ -13,7 +13,7 @@ connectar Claude. Jarvis gestiona projectes (llistar, cercar, pausar, arxivar,
 prioritzar), tasques amb venciment, notes de memòria explícita (decisions, preguntes
 obertes, fets, preferències), la vista d'un projecte i un resum diari per regles que es pot
 enviar per Telegram: 13 eines MCP i les rutes API equivalents, amb idempotència opcional i
-aïllament per propietari. Al codi (D027–D028, versió 0.3.0) hi afegeix assignatures amb
+aïllament per propietari. D027–D028 (versió 0.3.0) hi afegeix assignatures amb
 grups i professorat, lliuraments com a tasques de l'assignatura, exportació de totes les
 dades i operacions de política de dades per al desenvolupador (purga del que s'ha
 descartat i gestió de connexions OAuth): 19 eines. Només dades fictícies.
@@ -29,12 +29,11 @@ npm run build
 ```
 
 Les proves PostgreSQL dedicades i la configuració d'execució estan a la
-[guia de desenvolupament](docs/DEVELOPMENT.md). **Estat:** desplegat = D023–D026 (13 eines,
-migració 003 a Neon, publicat el 2026-11-25); falta que Claude web/app i Claude Code provin
-les 13 eines i Telegram no està configurat. Al codi però **no desplegat** = assignatures,
-exportació i operacions de política de dades (D027–D028), provats localment amb
-simuladors i PostgreSQL local; la migració 004 no s'ha aplicat a Neon. `npm run dev` arrenca en loopback; sense
-secrets, només salut és operativa.
+[guia de desenvolupament](docs/DEVELOPMENT.md). **Estat:** desplegat = D023–D028 (19 eines,
+migracions 003 i 004 a Neon, publicat el 2026-11-25); falta que Claude web/app i Claude Code
+es reconnectin i provin les 19 eines, Telegram no està configurat i la política de dades
+(D027) és una proposta pendent de confirmar, per això només dades fictícies. `npm run dev`
+arrenca en loopback; sense secrets, només salut és operativa.
 
 ## Documents principals
 

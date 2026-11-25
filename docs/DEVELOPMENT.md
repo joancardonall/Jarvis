@@ -166,7 +166,7 @@ confirma l'usuari.
    són més) i `build` genera el paquet sense desplegar res. *Si falla:* no continuïs; el
    problema és al codi local, no a Neon. Executa `npm test` **sol** i llegeix-ne el resultat
    abans de desplegar: vegeu la lliçó a la
-   [posada en marxa de D027–D028](#posada-en-marxa-de-d027d028-pendent).
+   [posada en marxa de D027–D028](#posada-en-marxa-de-d027d028-passos-13-executats-46-pendents).
 2. **Còpia abans de migrar: atenció.** Amb el codi d'aquesta branca, `npm run db:backup`
    exigeix que la BD ja tingui les migracions 001–003. Abans de migrar, Neon només en té
    001–002, així que l'ordre s'atura amb `migration_mismatch` **sense escriure res** (deduït
@@ -304,12 +304,13 @@ esborra també els secrets de Telegram. La migració 003 no es desfà automàtic
 
 ## Política de dades i universitat — D027–D028
 
-**Estat (2026-11-25): implementat i provat localment a la branca
-`feat/data-policy-university`; NO desplegat. Tots els passos d'aquesta secció estan
-PENDENTS i els executa o els confirma l'usuari.** La migració 004 **no** s'ha aplicat a Neon
-i el Worker públic continua amb la versió de D024–D026 (13 eines, sense assignatures ni
-exportació). Les ordres `data:purge`, `oauth:connections` i `oauth:revoke` només s'han provat
-com a funcions sobre PostgreSQL local, mai contra Neon. Evidència a
+**Estat (2026-11-25): desplegat** des de la branca `feat/data-policy-university` (pujada a
+GitHub, no fusionada a main). **Passos 1–3 executats** amb l'aprovació de l'usuari: migració
+004 a Neon, còpia format 3 i Worker publicat (versió `2c87252d-e793-4e6a-84b5-deefe77c8151`,
+19 eines). **Passos 4–6 pendents:** reconnectar els clients, validar amb dades fictícies i
+confirmar la política. Contra Neon, `data:purge` només s'ha executat en previsualització (tot
+a 0) i `oauth:connections` ha llistat 2 connexions; `oauth:revoke` i `data:purge --confirm`
+no s'hi han executat. Evidència a
 [CURRENT_STATE](CURRENT_STATE.md), decisions a [DECISIONS](DECISIONS.md), dades a
 [DATA_MODEL](DATA_MODEL.md), contractes a [API_CONTRACT](API_CONTRACT.md) i
 [MCP_CONTRACT](MCP_CONTRACT.md), riscos a [SECURITY_PRIVACY](SECURITY_PRIVACY.md).
@@ -323,7 +324,7 @@ SQL. **D028 (universitat)** afegeix assignatures amb els seus grups (teoria, sem
 laboratori) i tracta lliuraments i exàmens com a tasques amb `course_id`. Passa de 13 a 19
 eines MCP. Fins que l'usuari confirmi la política, **només dades fictícies**.
 
-### Posada en marxa de D027–D028 (pendent)
+### Posada en marxa de D027–D028 (passos 1–3 executats, 4–6 pendents)
 
 Ordre important: **migració abans de la còpia i del deploy**. La còpia exigeix que la BD
 tingui totes les migracions del codi, i el codi nou falla si la BD no té les taules noves.
@@ -355,6 +356,9 @@ Mai `npm test | grep ... && npx wrangler deploy ...`.
    *Si falla:* `migration_mismatch` vol dir que un checksum no coincideix i s'atura **sense
    canviar res**; no editis cap migració per fer-la passar. `privileges_too_broad` vol dir
    que el rol runtime no té exactament els permisos esperats: no despleguis.
+   **Executat el 2026-11-25:** migració 004 aplicada, permisos runtime verificats i
+   `db:verify` correcte. També ha passat `npm run dev:verify-neon` ampliat (driver real de
+   Neon, des de Node), que deixa files fictícies a Neon.
 2. **Còpia format 3** (terminal):
 
    ```sh
@@ -366,6 +370,7 @@ Mai `npm test | grep ... && npx wrangler deploy ...`.
    *Resultat:* `Logical snapshot of projects, courses, tasks and notes saved privately to ...`
    *Si falla:* `migration_mismatch` vol dir que la BD no té totes les migracions 001–004:
    torna al pas 1.
+   **Executat el 2026-11-25:** `backups/jarvis-2026-11-25T16-32-13-325Z.json`.
 3. **Proves i, després, deploy en una ordre a part** (terminal). Primer, només les proves:
 
    ```sh
@@ -386,6 +391,10 @@ Mai `npm test | grep ... && npx wrangler deploy ...`.
    *Resultat:* Wrangler mostra l'URL, un ID de versió nou i el cron `30 5-8 * * *`.
    *Si falla:* després del deploy, un 503 `service_unavailable` a les eines d'assignatures
    sol voler dir que la migració 004 no s'ha aplicat: fes el pas 1 o desfés el deploy.
+   **Executat el 2026-11-25:** `npm test` sol, 55/55 i `fail 0`; després, en una ordre a part,
+   deploy de la versió `2c87252d-e793-4e6a-84b5-deefe77c8151` amb el cron encara registrat.
+   Comprovat des de fora: `/health` 200; `/mcp`, `/api/v1/export` i `/api/v1/courses` sense
+   token 401; metadades OAuth 200.
 4. **Reconnectar els clients Claude** (navegador i terminal). A Claude web/app, Customize →
    Connectors → Jarvis: desconnectar i tornar a connectar. A Claude Code, `/mcp` → `jarvis`
    → reconnectar. Recomanació de permisos: `list_courses` i `get_course_overview` poden anar a
@@ -408,7 +417,8 @@ Mai `npm test | grep ... && npx wrangler deploy ...`.
    màxim per a les còpies. Confirma-la o demana canvis **abans** de posar-hi dades reals.
    *Resultat:* D027 passa de proposada a aprovada a [DECISIONS](DECISIONS.md).
 
-**Desfer:** `npx wrangler rollback` (terminal) torna a la versió de D024–D026. Les taules i
+**Desfer:** `npx wrangler rollback` (terminal) torna a la versió de D024–D026
+(`962035a5-07aa-4cc5-84cf-fc66fb0367f3`). Les taules i
 la columna noves poden quedar-se: el codi anterior les ignora. La migració 004 no es desfà
 automàticament.
 

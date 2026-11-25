@@ -4,7 +4,8 @@
 **desplegats** des del 2026-11-25 (migració 003 a Neon i Cron Trigger registrat), provats
 localment amb Telegram simulat. Encara **no hi ha bot creat ni secrets de Telegram
 pujats**, de manera que el cron no envia res i no s'ha verificat cap enviament real. Els
-lliuraments amb el nom de l'assignatura (D028) són al codi, no desplegats. Estat real a
+lliuraments amb el nom de l'assignatura (D028) estan desplegats des del 2026-11-25, sense
+validar encara amb un resum real. Estat real a
 [CURRENT_STATE](CURRENT_STATE.md); mecànica del cron i del registre a
 [ARCHITECTURE](ARCHITECTURE.md).
 
@@ -21,7 +22,7 @@ Tasques obertes, en tres seccions:
 
 Les tasques sense data no surten al resum. Les fetes i cancel·lades tampoc. Cada tasca
 mostra entre parèntesis el seu context: el nom de l'assignatura si és un lliurament
-(`course_id`, D028, al codi) i, si no, el del projecte. A la resposta estructurada porta
+(`course_id`, D028) i, si no, el del projecte. A la resposta estructurada porta
 `course_id` i `course_name`.
 
 ## Implementat: regles de seguiment de projectes

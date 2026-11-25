@@ -6,8 +6,8 @@ als contractes [API](API_CONTRACT.md) i [MCP](MCP_CONTRACT.md).
 **Estat:** les migracions 001–003 (`projects`, `oauth_grants`, `tasks`, `notes`,
 `summary_runs`) són **aplicades a Neon** i les fa servir el Worker publicat (003 des del
 2026-11-25). La migració `004_courses.sql` (D028: `courses`, `course_groups` i `course_id`
-a tasques i notes) està **implementada i provada amb PostgreSQL local** (inclòs el rol
-runtime), però **no aplicada a Neon**.
+a tasques i notes) està **aplicada a Neon** des del 2026-11-25 (permisos runtime verificats
+amb `db:verify`) i la fa servir el Worker publicat.
 
 ## Projectes: `projects`
 
@@ -76,7 +76,7 @@ les cerques i al resum, però no s'esborra i es pot recuperar tornant-la a `acti
 L'esborrat definitiu només el fa el desenvolupador amb la purga (vegeu
 [Cicle de vida de les dades](#cicle-de-vida-de-les-dades)).
 
-## Assignatures: `courses` (004, D028, no aplicada a Neon)
+## Assignatures: `courses` (004, D028)
 
 | Camp | Tipus i regla |
 | --- | --- |
@@ -93,7 +93,7 @@ L'esborrat definitiu només el fa el desenvolupador amb la purga (vegeu
 També `UNIQUE (id, owner_id)` per a les claus foranes compostes. Les assignatures no
 s'esborren: s'arxiven.
 
-## Grups d'assignatura: `course_groups` (004, D028, no aplicada a Neon)
+## Grups d'assignatura: `course_groups` (004, D028)
 
 | Camp | Tipus i regla |
 | --- | --- |
@@ -204,9 +204,9 @@ editables.
 
 Totes tenen `SELECT` i `INSERT`. Així, ni amb un error de codi el runtime pot canviar
 `owner_id`, `id`, `created_at` o `request_hash` d'una fila, ni el `course_id`, `kind` o
-`label` d'un grup (canviar-los en faria un altre grup). Els permisos de 001–003 estan
-aplicats a Neon (verificat amb `db:verify`); els de 004 només s'han provat amb PostgreSQL
-local (`npm run test:ops`, permisos negatius inclosos).
+`label` d'un grup (canviar-los en faria un altre grup). Els permisos de 001–004 estan
+aplicats a Neon (verificat amb `db:verify`); els permisos negatius s'han provat amb
+PostgreSQL local (`npm run test:ops`).
 
 Com que el runtime no té `DELETE`, les files d'`oauth_grants` caducades o revocades només
 s'esborren amb la purga del desenvolupador (secció següent).
@@ -246,8 +246,9 @@ perd l'enllaç amb el que desapareix. L'ordre n'informa a part («only unlinked�
 No toca els fitxers de còpia: s'han d'esborrar a mà (recomanació: no conservar còpies de més
 de 90 dies quan hi hagi dades reals). Les connexions es poden llistar
 (`npm run oauth:connections`) i revocar (`npm run oauth:revoke -- <id>` o `-- --all`) sense
-SQL. Purga i connexions només s'han provat com a funcions sobre PostgreSQL local, no
-contra Neon. Ordres a [DEVELOPMENT](DEVELOPMENT.md) i riscos a
+SQL. Contra Neon (2026-11-25) només s'ha executat la purga en previsualització (tot a 0, res
+esborrat) i el llistat de connexions; `data:purge --confirm` i `oauth:revoke` s'han provat
+només sobre PostgreSQL local. Ordres a [DEVELOPMENT](DEVELOPMENT.md) i riscos a
 [SECURITY_PRIVACY](SECURITY_PRIVACY.md).
 
 ## Còpia lògica (format 3)
@@ -264,7 +265,8 @@ després pren el valor per defecte (sense assignatures, `course_id` buit). Requi
 migracions amb què es va fer la còpia existeixin sense canvis. El format 1 antic
 (`backups/projects.json`) ja no es pot restaurar. La còpia exigeix que la BD tingui totes
 les migracions del codi: amb el codi de D028 cal migrar 004 abans de fer-ne. Format 3
-provat amb PostgreSQL local; no s'ha fet cap còpia format 3 de Neon. Procediment a
+provat amb PostgreSQL local; primera còpia format 3 de Neon feta el 2026-11-25 (restauració
+de format 3 provada només en local). Procediment a
 [DEVELOPMENT](DEVELOPMENT.md).
 
 ## Metadades operatives de migració
@@ -272,7 +274,7 @@ provat amb PostgreSQL local; no s'ha fet cap còpia format 3 de Neon. Procedimen
 `jarvis_migrations`: version (PK), sha256 i applied_at. Només accessible al rol
 migrador, no al runtime. `npm run db:migrate` aplica 001 i les migracions posteriors
 (002, 003 i 004) i registra cada revisió amb el seu checksum atòmicament amb l'esquema.
-No és una funcionalitat d'usuari. A Neon hi ha aplicades 001–003; 004 és pendent.
+No és una funcionalitat d'usuari. A Neon hi ha aplicades 001–004.
 Còpia/restauració a [DEVELOPMENT](DEVELOPMENT.md), decisions D018–D019, D026 i D027.
 
 ## Model conceptual futur (no implementat)
@@ -291,7 +293,7 @@ a `notes`), memòria explícita i el registre d'enviaments del resum. Queda com 
 
 ## Extensions posteriors
 
-- Universitat: `courses` i `course_groups` ja existeixen al codi (004) i els lliuraments són
+- Universitat: `courses` i `course_groups` ja existeixen (004, desplegada) i els lliuraments són
   tasques vinculades. Queden fora: professorat com a entitat pròpia, horari estructurat i
   qualificacions.
 - Entrenaments: `exercises`, `routines`, `routine_exercises`, `workout_sessions`, `workout_exercises`, `sets`. Conservar unitats, ordre, temps i historial; no sobreescriure sessions passades.

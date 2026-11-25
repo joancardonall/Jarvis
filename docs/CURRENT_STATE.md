@@ -23,15 +23,35 @@ connexió amb Claude Code, ara disponible; només dades fictícies i pla Free.
 **Publicat i verificat:** crear i recuperar projectes amb OAuth de GitHub (D023), des de Claude
 web/app i Claude Code. **Publicat el 2026-11-25, pendent de validar amb els clients:** llistar i editar projectes,
 tasques, notes i resum diari (D024–D026). Telegram implementat però no configurat.
-**Implementat i provat localment, no desplegat:** universitat, exportació, purga i gestió de
-connexions (D027–D028).
+**Desplegat el 2026-11-25, pendent de validar amb els clients:** universitat, exportació, purga
+i gestió de connexions (D027–D028). La política de dades encara és una proposta: només dades
+fictícies.
 
-## Política de dades i universitat (D027–D028) — implementat i provat localment; no desplegat
+## Política de dades i universitat (D027–D028) — desplegat; clients i política pendents
 
 Demanat per l'usuari el 2026-11-25 («continua amb el bloc 2 i 3»). Branca
-`feat/data-policy-university`, **no pujada a GitHub**. No autoritzat encara: pujar la branca,
-aplicar la migració 004 a Neon, desplegar ni desar dades reals. Decisions a
+`feat/data-policy-university`, pujada a GitHub i **no fusionada a main**. Posada en marxa
+aprovada per l'usuari el mateix dia («endavant amb la posada en marxa»). Continua sense
+autoritzar: desar dades reals (la política de dades no està confirmada). Decisions a
 [DECISIONS](DECISIONS.md) (D027, D028); passos de posada en marxa a [DEVELOPMENT](DEVELOPMENT.md).
+
+**Posada en marxa (2026-11-25)** (executat per l'agent amb l'aprovació de l'usuari):
+- Branca `feat/data-policy-university` pujada a GitHub (no fusionada a main).
+- `npm run db:migrate`: migració 004 aplicada a Neon i permisos runtime verificats;
+  `npm run db:verify` correcte.
+- `npm run db:backup`: còpia format 3 a `backups/jarvis-2026-11-25T16-32-13-325Z.json`.
+- `npm run dev:verify-neon` ampliat (assignatures, grups, lliurament i exportació; driver HTTP
+  real de Neon, des de Node, no pel Worker públic): **passa**. Ha deixat files fictícies a Neon
+  (assignatura «Synthetic Neon course proof» i relacionades).
+- `npm run data:purge` en mode **previsualització** contra Neon: tots els recomptes a 0, res
+  esborrat. `npm run oauth:connections` contra Neon: 2 connexions actives (claude.ai i
+  localhost). `oauth:revoke` i `data:purge --confirm` **no** s'han executat contra Neon.
+- `npm test` sol: 55/55, cap fallada. Després, en una ordre separada, `npx wrangler deploy`:
+  versió **`2c87252d-e793-4e6a-84b5-deefe77c8151`**, cron `30 5-8 * * *` encara registrat.
+  Versió anterior (per desfer): `962035a5-07aa-4cc5-84cf-fc66fb0367f3`.
+- Des de fora: `/health` 200; `/mcp`, `/api/v1/export` i `/api/v1/courses` sense token 401;
+  metadades OAuth 200. Publicades 19 eines (8 amb `readOnlyHint`; `export_data`, expressament,
+  no).
 
 **Implementat:**
 - Universitat: assignatures, grups amb professor, horari i lloc; lliuraments i exàmens com a
@@ -63,12 +83,13 @@ corrupció, no manipulació deliberada; l'exportació no té paginació.
 | `npm run test:worker` | 1/1 en workerd, 19 eines |
 | `npm run check`, `npm run build` | Correctes |
 
-**No verificat:** res d'això sobre Neon ni al Worker públic; `scripts/verify-neon.js` ampliat
-no s'ha executat; les ordres `data:purge`, `oauth:connections` i `oauth:revoke` només s'han
-provat com a funcions sobre PostgreSQL local; cap client Claude real ha vist les 19 eines.
+**No verificat:** cap client Claude real (web/app o Claude Code) s'ha reconnectat ni ha usat
+les 19 eines; cap crida a les eines noves pel Worker públic amb una connexió OAuth real;
+`oauth:revoke` i la purga confirmada no s'han executat contra Neon; Telegram sense configurar.
 
-**Pendent de l'usuari:** aprovar pujar la branca, migrar i desplegar; confirmar la política
-de dades (30 dies abans de purgar, 90 dies de còpies, dades que no s'hi desen).
+**Pendent de l'usuari:** reconnectar els clients i validar les 19 eines amb dades fictícies;
+confirmar la política de dades (30 dies abans de purgar, 90 dies de còpies, dades que no s'hi
+desen); fusionar les branques a main.
 
 ## Projectes, tasques, memòria, resum i Telegram (D024–D026) — desplegat; clients i Telegram pendents
 
@@ -352,10 +373,10 @@ Els timings que Wrangler imprimeix són durada de petició, **no CPU del proveï
   límits reals sota càrrega i clients MCP conversacionals finals pendents.
 - Windows, Inspector manual i Codex com a clients de Jarvis no verificats.
   Claude web/app i Claude Code verificats el 2026-11-25.
-- La còpia només cobreix projects i migració coneguda: no és pg_dump complet,
-  recuperació del compte ni política de còpies per dades personals. No hi ha
-  xifrat propi, retenció automatitzada ni còpia fora del dispositiu provats.
-- OAuth implementat però no publicat (vegeu a dalt). No hi ha login web propi,
+- La còpia cobreix projectes, assignatures, grups, tasques i notes (format 3): no és pg_dump
+  complet ni recuperació del compte. No hi ha xifrat propi, retenció automatitzada ni còpia
+  fora del dispositiu provats. La política de còpies de D027 és una proposta.
+- OAuth publicat i verificat (D023). No hi ha login web propi,
   rate limiter distribuït o garanties de disponibilitat.
   Quotes Free poden interrompre el servei; cap fallback facturable.
 
@@ -365,13 +386,15 @@ La preparació Free, migració, persistència i restauració remotes de l'increm
 han quedat verificades. No cal repetir ops:provision, token, backup o restore:
 aquests scripts rebutgen sobreescriure fitxers o bases ja ocupats.
 
-**Següent pas: posar en marxa D024–D026** seguint
-[DEVELOPMENT](DEVELOPMENT.md): migració i deploy fets; falta reconnectar clients i validar.
+**Següent pas: validar D024–D028 amb els clients reals** seguint
+[DEVELOPMENT](DEVELOPMENT.md): migracions 003 i 004 i deploy fets; falta reconnectar Claude
+web/app i Claude Code, provar les 19 eines amb dades fictícies i que l'usuari confirmi la
+política de dades.
 Publicació inicial autoritzada i executada segons D021. HTTPS i `npm run dev:verify-remote` ja passen.
 No habilitar autodeploy. Les dades personals continuen prohibides.
 Guia i ordres a [DEVELOPMENT](DEVELOPMENT.md). La reconciliació documental i el
 [flux Git](GIT_WORKFLOW.md) estan aprovats; rotació real autoritzada i executada a D022.
-Fins que D024–D026 es publiqui, un xat nou encara necessita conèixer l’UUID del projecte.
+Des de D024–D026 un xat nou pot trobar un projecte pel nom (`list_projects`), sense l’UUID.
 
 ## Objectius futurs
 
@@ -387,10 +410,9 @@ desplegar ni fusionar. La branca també conté el registre de la validació de C
 (`docs/claude-code-validation`), que tampoc és a main.
 
 D027–D028 implementades a `feat/data-policy-university` (surt de `feat/jarvis-core`), amb
-revisió independent aplicada; sense pujar, migrar ni desplegar. Següent: l'usuari aprova la
-posada en marxa i confirma la política de dades.
+revisió independent aplicada. El 2026-11-25: branca pujada (no fusionada), migració 004 a
+Neon, còpia format 3 i Worker desplegat (versió `2c87252d-e793-4e6a-84b5-deefe77c8151`).
 
-Migració 003 aplicada, Worker desplegat i branca pujada el 2026-11-25. Pendent: reconnectar
-els clients, validar les 13 eines amb dades fictícies i, més endavant, activar Telegram. Després: política de dades
-personals abans de posar-hi res real, i aprovar l'abast del bloc següent del
-[roadmap](roadmap.md) (universitat i calendari, app web, entrenaments).
+Pendent: reconnectar els clients, validar les 19 eines amb dades fictícies i, més endavant,
+activar Telegram. L'usuari ha de confirmar la política de dades abans de posar-hi res real, i aprovar l'abast del bloc següent del
+[roadmap](roadmap.md) (calendari, app web, entrenaments).

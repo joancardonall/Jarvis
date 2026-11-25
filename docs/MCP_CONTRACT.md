@@ -13,11 +13,11 @@ navegador. Passos i limitacions a [DEVELOPMENT](DEVELOPMENT.md).
 
 ## Eines
 
-**Estat:** **19 eines al codi, 13 desplegades.** Les 13 de D023–D026 estan publicades al
-Worker des del 2026-11-25 (verificat amb el driver real de Neon i una lectura amb la
-connexió OAuth real); falta que Claude web/app i Claude Code es reconnectin i les provin.
-Les 6 de D027–D028 (marcades *codi*) estan provades localment (client MCP oficial contra
-simulador, PostgreSQL local i workerd amb 19 eines), però **no desplegades**.
+**Estat:** **19 eines desplegades** al Worker públic. Les 13 de D023–D026 es van publicar el
+2026-11-25 (verificat amb el driver real de Neon i una lectura amb la connexió OAuth real).
+Les 6 de D027–D028 es van publicar el mateix dia (versió `2c87252d`), verificades a Neon des de
+Node però **no** pel Worker públic amb una connexió OAuth real. Falta que Claude web/app i
+Claude Code es reconnectin i provin les 19.
 
 Totes porten el prefix `jarvis.` (per exemple, `jarvis.list_tasks`). 8 eines de lectura
 declaren l'anotació MCP `readOnlyHint` (indica al client que no canvien res). `export_data`
@@ -39,14 +39,14 @@ que el client demani permís abans.
 | `update_note` | escriptura | `note_id` + almenys un de `content`, `kind`, `status` | nota |
 | `get_daily_summary` | lectura | `date?` | resum del dia |
 | `send_daily_summary` | escriptura externa | cap | `{sent, date}` |
-| `create_course` *(codi)* | escriptura | `name`, `code?`, `term?`, `notes?`, `idempotency_key?` | assignatura |
-| `list_courses` *(codi)* | lectura | `status?` (per defecte actives), `query?` (nom o codi), `limit?` | `{courses, truncated}`, cada una amb els seus grups actius |
-| `update_course` *(codi)* | escriptura | `course_id` + almenys un de `name`, `code`, `term`, `notes`, `status` | assignatura |
-| `save_course_group` *(codi)* | escriptura | `course_id`, `kind`, `label?`, `teacher?`, `schedule?`, `location?`, `status?` | grup (creat o actualitzat) |
-| `get_course_overview` *(codi)* | lectura | `course_id` | `{course, open_tasks, notes, truncated}` |
-| `export_data` *(codi)* | lectura | cap | exportació completa |
+| `create_course` | escriptura | `name`, `code?`, `term?`, `notes?`, `idempotency_key?` | assignatura |
+| `list_courses` | lectura | `status?` (per defecte actives), `query?` (nom o codi), `limit?` | `{courses, truncated}`, cada una amb els seus grups actius |
+| `update_course` | escriptura | `course_id` + almenys un de `name`, `code`, `term`, `notes`, `status` | assignatura |
+| `save_course_group` | escriptura | `course_id`, `kind`, `label?`, `teacher?`, `schedule?`, `location?`, `status?` | grup (creat o actualitzat) |
+| `get_course_overview` | lectura | `course_id` | `{course, open_tasks, notes, truncated}` |
+| `export_data` | lectura | cap | exportació completa |
 
-Canvis d'entrada *(codi)*: `create_task`, `list_tasks`, `update_task`, `save_note` i
+Canvis d'entrada de D028: `create_task`, `list_tasks`, `update_task`, `save_note` i
 `search_notes` accepten `course_id` (a `update_task`, `null` el desvincula). Les tasques i
 notes retornades inclouen `course_id`, i les tasques de `get_daily_summary` porten
 `course_id` i `course_name`. Un lliurament o un examen és una tasca amb `course_id`; el
